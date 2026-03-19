@@ -1,0 +1,94 @@
+# Production Docker Compose — WAF Console + Redis + PostgreSQL
+# ============================================================
+# Usage:
+#   cp .env.example .env  # edit settings
+#   docker-compose -f docker-compose.prod.yml up -d
+#   docker exec waf-console node migrate.js up
+
+version: '3.8'
+
+services:
+  waf:
+    build: .
+    container_name: waf-console
+    restart: unless-stopped
+    ports:
+      - "3000:3000"     # Analyst Console
+      - "3001:3001"     # Client Console
+      - "8080:8080"     # WAF Proxy (HTTP)
+      - "8443:8443"     # WAF Proxy (HTTPS)
+    environment:
+      - NODE_ENV=production
+      - DB_DRIVER=${DB_DRIVER:-sqlite}
+      - DB_PATH=./data/waf_events.db
+      # LO-01 fix: Redis URL now includes password (must match REDIS_PASSWORD below)
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - WAF_MODE=${WAF_MODE:-BLOCKING}
+      - BIND_ADDRESS=0.0.0.0
+      - DEFAULT_BACKEND=${DEFAULT_BACKEND:-http://backend:80}
+      - TLS_CERT_PATH=./data/certs/fullchain.pem
+      - TLS_KEY_PATH=./data/certs/privkey.pem
+      - ACME_ENABLED=${ACME_ENABLED:-false}
+      - ACME_EMAIL=${ACME_EMAIL:-}
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - OTX_API_KEY=${OTX_API_KEY:-}
+      - SIEM_SYSLOG_HOST=${SIEM_SYSLOG_HOST:-}
+      - SIEM_WEBHOOK_URL=${SIEM_WEBHOOK_URL:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - LICENSE_KEY=${LICENSE_KEY:-}
+    volumes:
+      - waf-data:/app/data
+      - waf-logs:/app/logs
+      - waf-certs:/app/data/certs
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "node", "-e", "const h=require('http');h.get('http://localhost:3000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: waf-redis
+    restart: unless-stopped
+    # LO-01 fix: requirepass prevents unauthenticated access from other containers
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Uncomment for PostgreSQL (set DB_DRIVER=postgres in .env)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: waf-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: waf_production
+  #     POSTGRES_USER: waf
+  #     POSTGRES_PASSWORD: ${PG_PASSWORD:-waf_secret}
+  #   volumes:
+  #     - pg-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U waf -d waf_production"]
+  #     interval: 10s
+  #     timeout: 3s
+  #     retries: 5
+
+volumes:
+  waf-data:
+  waf-logs:
+  waf-certs:
+  redis-data:
+  # pg-data:

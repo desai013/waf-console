@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="ModSecurity WAF Analyst Console - Real-time web application firewall monitoring and threat analysis dashboard">
+    <title>ModSecurity WAF — Analyst Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <path d="M16 2L3 8v8c0 7.73 5.55 14.95 13 16.73C23.45 30.95 29 23.73 29 16V8L16 2z"
+                        fill="url(#shield-grad)" stroke="rgba(255,255,255,0.2)" stroke-width="1" />
+                    <path d="M16 6L7 10v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12v-6L16 6z" fill="none"
+                        stroke="url(#shield-inner)" stroke-width="1.5" />
+                    <circle cx="16" cy="15" r="3" fill="url(#shield-inner)" />
+                    <defs>
+                        <linearGradient id="shield-grad" x1="3" y1="2" x2="29" y2="30">
+                            <stop offset="0%" stop-color="#00d4ff" />
+                            <stop offset="100%" stop-color="#7c3aed" />
+                        </linearGradient>
+                        <linearGradient id="shield-inner" x1="7" y1="6" x2="25" y2="28">
+                            <stop offset="0%" stop-color="#00d4ff" />
+                            <stop offset="100%" stop-color="#a855f7" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div class="brand-text">
+                <span class="brand-name">ModSec</span>
+                <span class="brand-sub">WAF Console</span>
+            </div>
+        </div>
+
+        <!-- WAF MODE CONTROL (Analyst Toggle) -->
+        <div class="waf-mode-control" id="waf-mode-control">
+            <div class="mode-label">WAF Engine</div>
+            <div class="mode-toggle-group">
+                <button class="mode-btn active" id="mode-blocking" data-mode="BLOCKING">🛡️ BLOCKING</button>
+                <button class="mode-btn" id="mode-detection" data-mode="DETECTION">👁️ DETECT</button>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-view="dashboard" id="nav-dashboard">
+                <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-view="events" id="nav-events">
+                <span class="nav-icon">📋</span><span class="nav-label">Events</span>
+                <span class="nav-badge" id="event-badge">0</span>
+            </a>
+            <a href="#" class="nav-item" data-view="live" id="nav-live">
+                <span class="nav-icon">🔴</span><span class="nav-label">Live Feed</span>
+                <span class="live-dot"></span>
+            </a>
+            <a href="#" class="nav-item" data-view="rules" id="nav-rules">
+                <span class="nav-icon">🛡️</span><span class="nav-label">Rules</span>
+            </a>
+            <a href="#" class="nav-item" data-view="whitelist" id="nav-whitelist">
+                <span class="nav-icon">✅</span><span class="nav-label">Whitelist</span>
+            </a>
+            <a href="#" class="nav-item" data-view="sites" id="nav-sites">
+                <span class="nav-icon">🌐</span><span class="nav-label">Sites</span>
+            </a>
+            <a href="#" class="nav-item" data-view="onboarding" id="nav-onboarding">
+                <span class="nav-icon">📖</span><span class="nav-label">Onboarding</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="waf-status">
+                <span class="status-dot" id="waf-status-dot"></span>
+                <span class="status-text" id="waf-status-text">LOADING...</span>
+            </div>
+            <div class="sidebar-version">OWASP ModSecurity v3</div>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" id="main-content">
+        <header class="main-header">
+            <div class="header-left">
+                <button class="menu-toggle" id="menu-toggle">☰</button>
+                <h1 class="page-title" id="page-title">Dashboard</h1>
+            </div>
+            <div class="header-right">
+                <div class="search-bar" id="global-search-wrapper">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" placeholder="Search events, IPs, URIs..." id="global-search"
+                        class="search-input">
+                </div>
+                <div class="header-time" id="header-time"></div>
+            </div>
+        </header>
+
+        <!-- DASHBOARD VIEW -->
+        <section class="view active" id="view-dashboard">
+            <div class="stats-grid">
+                <div class="stat-card stat-total">
+                    <div class="stat-icon">📡</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-total-value">—</div>
+                        <div class="stat-label">Total Events</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-blocked">
+                    <div class="stat-icon">⛔</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-blocked-value">—</div>
+                        <div class="stat-label">Blocked (403)</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-critical">
+                    <div class="stat-icon">🔴</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-critical-value">—</div>
+                        <div class="stat-label">Critical</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-high">
+                    <div class="stat-icon">🟠</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-high-value">—</div>
+                        <div class="stat-label">High</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-sources">
+                    <div class="stat-icon">🌍</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-sources-value">—</div>
+                        <div class="stat-label">Unique Sources</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-hosts">
+                    <div class="stat-icon">🌐</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-hosts-value">—</div>
+                        <div class="stat-label">Protected Sites</div>
+                    </div>
+                </div>
+            </div>
+            <div class="charts-grid">
+                <div class="chart-card wide">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Event Timeline</h3>
+                        <div class="chart-actions">
+                            <button class="chip active" data-hours="6">6H</button>
+                            <button class="chip" data-hours="12">12H</button>
+                            <button class="chip" data-hours="24">24H</button>
+                        </div>
+                    </div>
+                    <canvas id="timeline-chart" height="220"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Attack Types</h3>
+                    </div>
+                    <canvas id="attack-chart" height="220"></canvas>
+                </div>
+            </div>
+            <div class="tables-grid">
+                <div class="table-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Top Source IPs</h3>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>IP Address</th>
+                                <th>Requests</th>
+                                <th>Blocked</th>
+                                <th>Alerts</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-sources-body"></tbody>
+                    </table>
+                </div>
+                <div class="table-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Top Endpoints</h3>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>URI</th>
+                                <th>Hits</th>
+                                <th>Blocked</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-endpoints-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- EVENTS VIEW -->
+        <section class="view" id="view-events">
+            <div class="events-toolbar">
+                <div class="filter-group">
+                    <select id="filter-severity" class="filter-select">
+                        <option value="ALL">All Severities</option>
+                        <option value="CRITICAL">🔴 Critical</option>
+                        <option value="HIGH">🟠 High</option>
+                        <option value="MEDIUM">🟡 Medium</option>
+                        <option value="LOW">🔵 Low</option>
+                        <option value="INFO">⚪ Info</option>
+                    </select>
+                    <select id="filter-action" class="filter-select">
+                        <option value="ALL">All Actions</option>
+                        <option value="BLOCK">⛔ Blocked</option>
+                        <option value="ALERT">⚠️ Alert</option>
+                        <option value="PASS">✅ Passed</option>
+                    </select>
+                    <input type="text" id="filter-search" class="filter-input" placeholder="Search URI, IP, rule...">
+                    <button class="btn btn-primary" id="filter-apply">Search</button>
+                    <button class="btn btn-ghost" id="filter-clear">Clear</button>
+                </div>
+                <div class="events-count" id="events-count">0 events</div>
+            </div>
+            <div class="events-table-wrapper">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th class="col-sev">Sev</th>
+                            <th class="col-time">Time</th>
+                            <th class="col-action">Action</th>
+                            <th class="col-source">Source IP</th>
+                            <th class="col-method">Method</th>
+                            <th class="col-uri">URI</th>
+                            <th class="col-status">Status</th>
+                            <th class="col-rule">Rule / Attack</th>
+                            <th class="col-dur">Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="events-table-body"></tbody>
+                </table>
+            </div>
+            <div class="events-pagination">
+                <button class="btn btn-ghost" id="events-prev" disabled>← Previous</button>
+                <span id="events-page-info">Page 1</span>
+                <button class="btn btn-ghost" id="events-next">Next →</button>
+            </div>
+        </section>
+
+        <!-- LIVE FEED VIEW -->
+        <section class="view" id="view-live">
+            <div class="live-header">
+                <div class="live-indicator"><span class="live-pulse"></span><span>LIVE — Real-time Traffic
+                        Monitor</span></div>
+                <div class="live-controls">
+                    <button class="btn btn-sm" id="live-pause">⏸ Pause</button>
+                    <button class="btn btn-sm" id="live-clear">🗑️ Clear</button>
+                    <label class="toggle-label"><input type="checkbox" id="live-alerts-only"> Alerts Only</label>
+                </div>
+            </div>
+            <div class="live-feed" id="live-feed"></div>
+        </section>
+
+        <!-- RULES VIEW (analyst can enable/disable rules) -->
+        <section class="view" id="view-rules">
+            <div class="rules-header">
+                <h2>Active WAF Rules</h2>
+                <p class="rules-description">Analysts can <strong>enable/disable</strong> individual rules. Disabled
+                    rules will not trigger alerts or blocks.</p>
+            </div>
+            <div class="rules-grid" id="rules-grid"></div>
+        </section>
+
+        <!-- WHITELIST VIEW (False-Positive Management) -->
+        <section class="view" id="view-whitelist">
+            <div class="whitelist-header">
+                <div>
+                    <h2>Whitelist / Exception Manager</h2>
+                    <p class="rules-description">Manage false positives. Whitelisted items bypass WAF inspection. You
+                        can also whitelist directly from event details.</p>
+                </div>
+                <button class="btn btn-primary" id="add-whitelist-btn">+ Add Exception</button>
+            </div>
+
+            <div class="whitelist-stats" id="whitelist-stats">
+                <div class="wl-stat"><span class="wl-stat-value" id="wl-total">0</span><span class="wl-stat-label">Total
+                        Exceptions</span></div>
+                <div class="wl-stat"><span class="wl-stat-value" id="wl-active">0</span><span
+                        class="wl-stat-label">Active</span></div>
+                <div class="wl-stat"><span class="wl-stat-value" id="wl-disabled">0</span><span
+                        class="wl-stat-label">Disabled</span></div>
+            </div>
+
+            <div class="whitelist-table-wrapper">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Type</th>
+                            <th>Value</th>
+                            <th>Rule</th>
+                            <th>Reason</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="whitelist-table-body"></tbody>
+                </table>
+            </div>
+
+            <!-- Add Whitelist Modal -->
+            <div class="modal-overlay" id="whitelist-modal" style="display:none">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Add Whitelist Exception</h3><button class="modal-close" id="wl-modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="wl-type">Exception Type</label>
+                            <select id="wl-type" class="form-input">
+                                <option value="ip">IP Address — skip all rules for this IP</option>
+                                <option value="uri">URI Prefix — skip all rules for URIs starting with this path
+                                </option>
+                                <option value="uri_exact">URI Exact — skip for this exact URI</option>
+                                <option value="rule">Rule ID — disable a specific rule globally</option>
+                                <option value="ip_rule">IP + Rule — skip a rule for a specific IP</option>
+                                <option value="uri_rule">URI + Rule — skip a rule for a specific URI path</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="wl-value">Value <small id="wl-value-hint">(enter the IP address)</small></label>
+                            <input type="text" id="wl-value" class="form-input" placeholder="e.g., 192.168.1.100">
+                        </div>
+                        <div class="form-group">
+                            <label for="wl-reason">Reason / Justification</label>
+                            <input type="text" id="wl-reason" class="form-input"
+                                placeholder="e.g., Internal monitoring system, false positive on login page">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-ghost" id="wl-modal-cancel">Cancel</button>
+                        <button class="btn btn-primary" id="wl-modal-save">Add Exception</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SITES VIEW -->
+        <section class="view" id="view-sites">
+            <div class="sites-header">
+                <h2>Protected Websites</h2>
+                <button class="btn btn-primary" id="add-site-btn">+ Add Website</button>
+            </div>
+            <div class="sites-grid" id="sites-grid"></div>
+            <div class="modal-overlay" id="site-modal" style="display:none">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 id="modal-title">Add Website</h3><button class="modal-close"
+                            id="modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group"><label for="site-name">Site Name</label><input type="text"
+                                id="site-name" placeholder="My Web App" class="form-input"></div>
+                        <div class="form-group"><label for="site-domain">Domain <small>(incoming requests matching this
+                                    host header)</small></label><input type="text" id="site-domain"
+                                placeholder="app.example.com" class="form-input"></div>
+                        <div class="form-group"><label for="site-target">Backend URL <small>(where the real server
+                                    lives)</small></label><input type="text" id="site-target"
+                                placeholder="http://192.168.1.100:8080" class="form-input"></div>
+                        <div class="form-group"><label class="toggle-label"><input type="checkbox" id="site-enabled"
+                                    checked> Enabled</label></div>
+                    </div>
+                    <div class="modal-footer"><button class="btn btn-ghost" id="modal-cancel">Cancel</button><button
+                            class="btn btn-primary" id="modal-save">Save</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ONBOARDING GUIDE VIEW -->
+        <section class="view" id="view-onboarding">
+            <div class="onboarding-content">
+                <div class="onboarding-hero">
+                    <h1>🛡️ Live Website Onboarding Guide</h1>
+                    <p class="onboarding-subtitle">Step-by-step instructions to protect a live production website with
+                        this WAF</p>
+                </div>
+                <div class="onboarding-steps">
+                    <div class="step-card">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Identify Your Website</h3>
+                            <p>Gather the following information about the website you want to protect:</p>
+                            <ul>
+                                <li><strong>Public Domain:</strong> The domain users visit (e.g.,
+                                    <code>shop.example.com</code>)</li>
+                                <li><strong>Backend Server IP/URL:</strong> The real server (e.g.,
+                                    <code>http://10.0.1.50:3000</code>)</li>
+                                <li><strong>Backend Port:</strong> The port your application listens on</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Deploy the WAF Server</h3>
+                            <p>Run the WAF on a server that is <strong>accessible from the internet</strong> (or at
+                                least from where your users connect).</p>
+                            <div class="code-block">
+                                <pre><code># On the WAF server (e.g., a VPS or cloud VM)
+cd /path/to/ModSecurity/waf-console
+
+# Install dependencies
+npm install
+
+# Start the WAF (binds to 0.0.0.0 — all interfaces)
+npm start
+
+# Or run in background with PM2:
+npm install -g pm2
+pm2 start server.js --name "waf-console"
+pm2 save</code></pre>
+                            </div>
+                            <p>The WAF exposes two ports:</p>
+                            <ul>
+                                <li><code>:8080</code> — WAF Proxy (all website traffic goes through here)</li>
+                                <li><code>:3000</code> — Analyst Console (dashboard for monitoring)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Register the Website in the WAF</h3>
+                            <p>Open the Analyst Console at <code>http://&lt;WAF_IP&gt;:3000</code>, go to
+                                <strong>Sites</strong>, and click <strong>"+ Add Website"</strong>:</p>
+                            <ul>
+                                <li><strong>Site Name:</strong> "Production Store"</li>
+                                <li><strong>Domain:</strong> <code>shop.example.com</code></li>
+                                <li><strong>Backend URL:</strong> <code>http://10.0.1.50:3000</code></li>
+                            </ul>
+                            <p>This tells the WAF: <em>"When a request arrives with Host: shop.example.com, inspect it
+                                    and then forward to http://10.0.1.50:3000"</em></p>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Update DNS Records</h3>
+                            <p>Change your DNS so <code>shop.example.com</code> points to the <strong>WAF server's
+                                    IP</strong> instead of the backend directly:</p>
+                            <div class="code-block">
+                                <pre><code># DNS A Record Change:
+# BEFORE: shop.example.com → 10.0.1.50 (direct to backend)
+# AFTER:  shop.example.com → 203.0.113.10 (WAF server IP)
+
+# If using Cloudflare, AWS Route53, etc:
+# Update the A record to point to your WAF server's public IP
+# TTL: Set low initially (60s) so changes propagate fast</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h3>Set Up Firewall Rules on Backend</h3>
+                            <p>Lock down your backend so it <strong>only accepts traffic from the WAF</strong>:</p>
+                            <div class="code-block">
+                                <pre><code># Linux (iptables)
+iptables -A INPUT -p tcp --dport 3000 -s &lt;WAF_IP&gt; -j ACCEPT
+iptables -A INPUT -p tcp --dport 3000 -j DROP
+
+# Linux (ufw)
+ufw allow from &lt;WAF_IP&gt; to any port 3000
+ufw deny 3000
+
+# Windows PowerShell
+New-NetFirewallRule -DisplayName "Allow WAF Only" `
+  -Direction Inbound -LocalPort 3000 `
+  -RemoteAddress &lt;WAF_IP&gt; -Action Allow
+
+# Cloud (AWS Security Group)
+# Inbound rule: Port 3000, Source: WAF_IP/32</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <h3>Add TLS/SSL (HTTPS)</h3>
+                            <p>For production, put an <strong>SSL-terminating reverse proxy</strong> in front of the WAF
+                                (e.g., Nginx, Caddy, or a cloud load balancer):</p>
+                            <div class="code-block">
+                                <pre><code># Nginx config (on the WAF server)
+server {
+    listen 443 ssl;
+    server_name shop.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/shop.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/shop.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Or use Caddy (auto HTTPS):
+# shop.example.com {
+#     reverse_proxy localhost:8080
+# }</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">7</div>
+                        <div class="step-content">
+                            <h3>Test the Setup</h3>
+                            <div class="code-block">
+                                <pre><code># Test normal request (should get your website content)
+curl -v https://shop.example.com/
+
+# Test that WAF blocks SQL Injection (should get 403)
+curl "https://shop.example.com/search?q=1' OR 1=1--"
+
+# Test XSS blocking (should get 403)
+curl "https://shop.example.com/page?x=&lt;script&gt;alert(1)&lt;/script&gt;"
+
+# Check the Analyst Console for these events
+# Open http://&lt;WAF_IP&gt;:3000 → Live Feed tab</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">8</div>
+                        <div class="step-content">
+                            <h3>Handle False Positives</h3>
+                            <p>If legitimate requests are being blocked:</p>
+                            <ol>
+                                <li>Go to the <strong>Events</strong> tab and find the blocked request</li>
+                                <li>Click on the event to view details</li>
+                                <li>Click <strong>"Whitelist"</strong> and choose an exception type:
+                                    <ul>
+                                        <li><strong>Whitelist IP:</strong> This IP will never be blocked</li>
+                                        <li><strong>Whitelist URI:</strong> This URL path will never be blocked</li>
+                                        <li><strong>Whitelist Rule for IP:</strong> Skip this specific rule for this IP
+                                            only</li>
+                                        <li><strong>Whitelist Rule for URI:</strong> Skip this specific rule for this
+                                            path only</li>
+                                    </ul>
+                                </li>
+                                <li>You can manage all exceptions in the <strong>Whitelist</strong> tab</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="step-card">
+                        <div class="step-number">9</div>
+                        <div class="step-content">
+                            <h3>Monitor & Tune Continuously</h3>
+                            <ul>
+                                <li>Use the <strong>Dashboard</strong> for overview metrics</li>
+                                <li>Use <strong>Live Feed</strong> to watch traffic in real-time</li>
+                                <li>Use <strong>Events</strong> to search/filter historical data</li>
+                                <li>Toggle WAF between <strong>BLOCKING</strong> ↔ <strong>DETECTION</strong> mode from
+                                    the sidebar</li>
+                                <li>Enable/disable individual rules from the <strong>Rules</strong> tab</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="onboarding-architecture">
+                    <h2>Live Architecture</h2>
+                    <div class="arch-diagram">
+                        <div class="arch-node arch-user"><span class="arch-emoji">👤</span><span>Internet Users</span>
+                        </div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-node arch-dns"><span
+                                class="arch-emoji">🌐</span><span>DNS</span><small>shop.example.com</small></div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-node" style="border-color:#eab308"><span class="arch-emoji">🔒</span><span>SSL
+                                (Nginx/Caddy)</span><small>:443 HTTPS</small></div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-node arch-waf"><span class="arch-emoji">🛡️</span><span>WAF
+                                Proxy</span><small>:8080 — Inspects + Blocks</small></div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-node arch-backend"><span class="arch-emoji">🖥️</span><span>Backend
+                                Server</span><small>Private network</small></div>
+                    </div>
+                    <div class="arch-analyst">
+                        <div class="arch-arrow-down">↓ logs & control</div>
+                        <div class="arch-node arch-console"><span class="arch-emoji">📊</span><span>Analyst Console
+                                :3000</span><small>Monitor, whitelist, toggle rules</small></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Event Detail Drawer -->
+        <div class="event-drawer" id="event-drawer" style="display:none">
+            <div class="drawer-header">
+                <h3>Event Details</h3>
+                <button class="drawer-close" id="drawer-close">&times;</button>
+            </div>
+            <div class="drawer-body" id="drawer-body"></div>
+        </div>
+    </main>
+    <script src="app.js"></script>
+</body>
+
+</html>

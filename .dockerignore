@@ -1,0 +1,32 @@
+node_modules
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+
+# ---- CRITICAL: Never bake runtime data into the image ----
+# This includes auto-generated secrets, SQLite DB, and TLS certs
+data/
+
+# Logs (created at runtime)
+logs/
+
+# Dev/build artifacts
+npm-debug.log*
+*.tgz
+.vscode/
+.idea/
+
+# Docker files (don't copy into image)
+Dockerfile
+docker-compose*.yml
+.github/
+
+# Test files (not needed in production image)
+tests/
+*.test.js
+
+# OS junk
+.DS_Store
+Thumbs.db

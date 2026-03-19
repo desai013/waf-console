@@ -1,0 +1,49 @@
+{
+  "name": "modsecurity-waf-console",
+  "version": "2.0.0",
+  "description": "ModSecurity WAF Console — Enterprise SIEM dashboard with dual-console architecture, attack chain analysis, bot detection, and compliance reporting",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test --test-force-exit --test-timeout=10000 tests/test-auth.js tests/test-license.js tests/test-rule-engine.js tests/test-bot-detector.js tests/test-db.js tests/test-anomaly-engine.js tests/test-threat-intel.js tests/test-alert-engine.js tests/test-api.js tests/test-proxy.js",
+    "production": "pm2 start ecosystem.config.js --env production",
+    "production:stop": "pm2 stop ecosystem.config.js",
+    "production:reload": "pm2 reload ecosystem.config.js --env production",
+    "production:logs": "pm2 logs waf-console",
+    "production:status": "pm2 status",
+    "simulate": "node simulate-traffic.js",
+    "docker:build": "docker build -t modsec-waf-console .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f waf",
+    "license:generate": "node -e \"const l=require('./license'); console.log(l.generateKey(process.argv[1], parseInt(process.argv[2]||'100'), process.argv[3]||'2027-12-31'))\" --"
+  },
+  "keywords": [
+    "modsecurity",
+    "waf",
+    "siem",
+    "firewall",
+    "security",
+    "nginx",
+    "reverse-proxy",
+    "bot-detection"
+  ],
+  "author": "ModSecurity WAF Console",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "chalk": "^4.1.2",
+    "express": "^4.21.0",
+    "http-proxy": "^1.18.1",
+    "joi": "^18.0.2",
+    "redis": "^4.6.0",
+    "uuid": "^11.0.0",
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "maxmind": "^4.3.0",
+    "nodemailer": "^6.9.0",
+    "pg": "^8.12.0"
+  }
+}

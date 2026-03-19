@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WAF Console — Setup</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #21262d;
+    --border: #30363d;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-glow: rgba(37, 99, 235, 0.3);
+    --success: #22c55e;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --radius: 12px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background-image: radial-gradient(ellipse at 50% 0%, rgba(37,99,235,0.12) 0%, transparent 70%);
+  }
+
+  .container {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* Header */
+  .logo {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+  .logo-icon {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border-radius: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 0 32px var(--accent-glow);
+  }
+  .logo h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+  .logo p  { color: var(--muted); font-size: 0.9rem; margin-top: 0.3rem; }
+
+  /* Progress steps */
+  .steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 2rem;
+  }
+  .step {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.8rem; color: var(--muted);
+  }
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 0.75rem;
+    transition: all 0.3s;
+    background: var(--surface);
+  }
+  .step.active   .step-num { border-color: var(--accent); color: var(--accent); background: var(--accent-glow); }
+  .step.complete .step-num { border-color: var(--success); background: var(--success); color: #fff; }
+  .step.active > span, .step.complete > span { color: var(--text); }
+  .step-line { width: 32px; height: 2px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+  .step-line.done { background: var(--success); }
+
+  /* Card */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .step-content { display: none; }
+  .step-content.active { display: block; }
+
+  h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.4rem; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.75rem; line-height: 1.5; }
+
+  /* Form */
+  .form-group { margin-bottom: 1.25rem; }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--text); }
+  label span { color: var(--muted); font-weight: 400; }
+  input[type="text"], input[type="password"], input[type="url"], select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 0.95rem;
+    padding: 0.65rem 0.9rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  input.error { border-color: var(--danger); }
+  .field-hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.35rem; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 8px;
+    font-size: 0.9rem; font-weight: 600;
+    border: none; cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    width: 100%;
+    padding: 0.85rem;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+  }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 16px var(--accent-glow); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Alert */
+  .alert {
+    padding: 0.8rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    margin-bottom: 1.25rem;
+    display: none;
+    line-height: 1.5;
+  }
+  .alert.show { display: flex; align-items: flex-start; gap: 0.6rem; }
+  .alert-error   { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+  .alert-success { background: rgba(34,197,94,0.1);  border: 1px solid rgba(34,197,94,0.3);  color: #86efac; }
+  .alert-info    { background: rgba(37,99,235,0.1);  border: 1px solid rgba(37,99,235,0.3);  color: #93c5fd; }
+
+  /* Info boxes */
+  .info-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.875rem;
+  }
+  .info-box-title { font-weight: 600; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem; }
+  .info-box code {
+    background: rgba(37,99,235,0.15);
+    color: #93c5fd;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+  }
+
+  /* Step 4 — done screen */
+  .done-icon {
+    width: 72px; height: 72px;
+    background: rgba(34,197,94,0.15);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    margin: 0 auto 1.5rem;
+    border: 2px solid rgba(34,197,94,0.4);
+    animation: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .next-steps { list-style: none; margin: 1.25rem 0; }
+  .next-steps li {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.875rem; line-height: 1.5;
+    color: var(--muted);
+  }
+  .next-steps li:last-child { border-bottom: none; }
+  .next-steps li::before { content: '→'; color: var(--accent); font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+
+  .btn-row { display: flex; gap: 1rem; margin-top: 1.25rem; }
+  .btn-row .btn { flex: 1; }
+
+  /* Mode badge */
+  .mode-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600;
+    background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3);
+  }
+  .mode-badge.blocking { background: rgba(34,197,94,0.12); color: #4ade80; border-color: rgba(34,197,94,0.3); }
+
+  /* Spinner */
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <h1>WAF Console Setup</h1>
+    <p>Let's get your firewall up and running in 3 minutes</p>
+  </div>
+
+  <!-- Progress steps -->
+  <div class="steps">
+    <div class="step active" id="s1"><div class="step-num">1</div><span>Admin</span></div>
+    <div class="step-line" id="l1"></div>
+    <div class="step" id="s2"><div class="step-num">2</div><span>First Site</span></div>
+    <div class="step-line" id="l2"></div>
+    <div class="step" id="s3"><div class="step-num">3</div><span>Complete</span></div>
+  </div>
+
+  <!-- Card -->
+  <div class="card">
+
+    <!-- ─── Step 1: Admin account ─────────────── -->
+    <div class="step-content active" id="step1">
+      <h2>Create your admin account</h2>
+      <p class="subtitle">This account has full control over WAF rules, blocked IPs, and site configurations. Use a strong password.</p>
+
+      <div class="alert alert-info show" id="pw-hint">
+        <span>💡</span>
+        <span>A temporary password was shown in the server logs at first boot. You're replacing it now with a permanent one.</span>
+      </div>
+      <div class="alert alert-error" id="step1-error"></div>
+
+      <div class="form-group">
+        <label for="username">Admin username</label>
+        <input type="text" id="username" value="admin" placeholder="admin" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="password">Password <span>(minimum 10 characters)</span></label>
+        <input type="password" id="password" placeholder="Create a strong password" autocomplete="new-password">
+        <div class="field-hint" id="pw-strength"></div>
+      </div>
+      <div class="form-group">
+        <label for="password2">Confirm password</label>
+        <input type="password" id="password2" placeholder="Confirm your password" autocomplete="new-password">
+      </div>
+
+      <button class="btn btn-primary" id="step1-btn" onclick="submitAdmin()">
+        Continue →
+      </button>
+    </div>
+
+    <!-- ─── Step 2: First site ─────────────────── -->
+    <div class="step-content" id="step2">
+      <h2>Add your first protected site</h2>
+      <p class="subtitle">Tell the WAF which website to protect and where to forward clean traffic. You can add more sites later.</p>
+
+      <div class="alert alert-error" id="step2-error"></div>
+
+      <div class="form-group">
+        <label for="site-name">Site name <span>(for your reference)</span></label>
+        <input type="text" id="site-name" placeholder="My Company Website">
+      </div>
+      <div class="form-group">
+        <label for="site-domain">Domain <span>(no https://)</span></label>
+        <input type="text" id="site-domain" placeholder="mycompany.com">
+      </div>
+      <div class="form-group">
+        <label for="site-target">Backend URL <span>(where your app is running)</span></label>
+        <input type="url" id="site-target" placeholder="http://10.0.0.5:80">
+        <div class="field-hint">💡 This is your server's internal IP address and port. The WAF forwards traffic here after inspection.</div>
+      </div>
+      <div class="form-group">
+        <label for="site-mode">Initial WAF mode</label>
+        <select id="site-mode">
+          <option value="DETECTION">Detection mode — log attacks but don't block (recommended to start)</option>
+          <option value="BLOCKING">Blocking mode — actively block attacks (switch to this after verification)</option>
+        </select>
+        <div class="field-hint">💡 Start in Detection mode to verify the WAF doesn't block any legitimate traffic before enabling full blocking.</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="skipSite()">Skip for now</button>
+        <button class="btn btn-primary" id="step2-btn" onclick="submitSite()" style="margin-top:0">Add Site →</button>
+      </div>
+    </div>
+
+    <!-- ─── Step 3: Done ───────────────────────── -->
+    <div class="step-content" id="step3">
+      <div style="text-align:center">
+        <div class="done-icon">✓</div>
+        <h2>WAF Console is ready!</h2>
+        <p class="subtitle" style="margin-top:0.5rem">Your firewall is configured and running. Here's what to do next:</p>
+      </div>
+
+      <ul class="next-steps">
+        <li>Route your website traffic through the WAF proxy (port <strong>8080</strong> for HTTP, <strong>8443</strong> for HTTPS)</li>
+        <li>Open the <strong>Analyst Console</strong> to watch live traffic and review detected attacks</li>
+        <li>When you're confident no legitimate traffic is being flagged, switch WAF mode to <strong>BLOCKING</strong></li>
+        <li>Read the <a href="/GETTING_STARTED.md" style="color: #60a5fa">Getting Started guide</a> for SMTP alerts, geo-blocking, and compliance reports</li>
+      </ul>
+
+      <div class="btn-row">
+        <a href="http://localhost:3001" class="btn btn-secondary" id="client-link">Client Console →</a>
+        <a href="/" class="btn btn-primary" style="margin-top:0">Open Analyst Console →</a>
+      </div>
+    </div>
+
+  </div><!-- /card -->
+</div><!-- /container -->
+
+<script>
+let step = 1;
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+
+function showAlert(id, msg, type = 'error') {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.className = `alert alert-${type} show`;
+}
+function hideAlert(id) {
+  document.getElementById(id).className = 'alert';
+}
+
+function setLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if (loading) {
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Please wait…';
+  } else {
+    btn.disabled = false;
+  }
+}
+
+async function post(url, data) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const json = await r.json();
+  if (!r.ok) throw new Error(json.error || `HTTP ${r.status}`);
+  return json;
+}
+
+function goToStep(n) {
+  // Update content panes
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`step${i}`).classList.toggle('active', i === n);
+  }
+  // Update progress indicators
+  for (let i = 1; i <= 3; i++) {
+    const s = document.getElementById(`s${i}`);
+    s.classList.remove('active', 'complete');
+    if (i < n) s.classList.add('complete');
+    if (i === n) s.classList.add('active');
+  }
+  for (let i = 1; i <= 2; i++) {
+    if (document.getElementById(`l${i}`))
+      document.getElementById(`l${i}`).classList.toggle('done', i < n);
+  }
+  step = n;
+  window.scrollTo(0, 0);
+}
+
+// ── Password strength indicator ──────────────────────────────────────────────
+document.getElementById('password').addEventListener('input', function() {
+  const v = this.value;
+  const el = document.getElementById('pw-strength');
+  if (!v) { el.textContent = ''; return; }
+  const score = [v.length >= 12, /[A-Z]/.test(v), /[0-9]/.test(v), /[^a-zA-Z0-9]/.test(v)].filter(Boolean).length;
+  const labels = ['Too short', 'Weak', 'Fair', 'Strong', 'Very strong'];
+  const colors = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#16a34a'];
+  el.textContent = `Strength: ${labels[score]}`;
+  el.style.color = colors[score];
+});
+
+// ── Step 1: Admin ────────────────────────────────────────────────────────────
+async function submitAdmin() {
+  hideAlert('step1-error');
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const password2 = document.getElementById('password2').value;
+
+  if (!username) return showAlert('step1-error', 'Username is required');
+  if (password.length < 10) return showAlert('step1-error', 'Password must be at least 10 characters');
+  if (password !== password2) return showAlert('step1-error', 'Passwords do not match');
+
+  setLoading('step1-btn', true);
+  try {
+    await post('/api/setup/admin', { username, password });
+    document.getElementById('step1-btn').innerHTML = '✓ Admin account created';
+    setTimeout(() => goToStep(2), 600);
+  } catch (err) {
+    showAlert('step1-error', err.message);
+    setLoading('step1-btn', false);
+    document.getElementById('step1-btn').textContent = 'Continue →';
+  }
+}
+
+// ── Step 2: First Site ────────────────────────────────────────────────────────
+async function submitSite() {
+  hideAlert('step2-error');
+  const name      = document.getElementById('site-name').value.trim();
+  const domain    = document.getElementById('site-domain').value.trim().toLowerCase().replace(/^https?:\/\//, '');
+  const targetUrl = document.getElementById('site-target').value.trim();
+  const waf_mode  = document.getElementById('site-mode').value;
+
+  if (!name || !domain || !targetUrl) return showAlert('step2-error', 'All fields are required');
+
+  setLoading('step2-btn', true);
+  try {
+    await post('/api/setup/site', { name, domain, targetUrl, waf_mode });
+    await post('/api/setup/complete', {});
+    goToStep(3);
+  } catch (err) {
+    showAlert('step2-error', err.message);
+    setLoading('step2-btn', false);
+    document.getElementById('step2-btn').textContent = 'Add Site →';
+  }
+}
+
+async function skipSite() {
+  await post('/api/setup/complete', {});
+  goToStep(3);
+}
+
+// ── Keyboard submit ──────────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (step === 1) submitAdmin();
+    else if (step === 2) submitSite();
+  }
+});
+
+// ── Init: load status ─────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const s = await fetch('/api/setup/status').then(r => r.json());
+    if (s.setupComplete) { window.location.href = '/'; }
+    // Update client console link with actual port
+    if (s.clientPort) {
+      // Use current browser hostname so this works from remote admin machines
+      document.getElementById('client-link').href =
+        `${window.location.protocol}//${window.location.hostname}:${s.clientPort}`;
+    }
+  } catch { /* ignore */ }
+})();
+</script>
+</body>
+</html>

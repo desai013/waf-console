@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WAF Client Console - Site onboarding, live monitoring, and request management">
+    <title>WAF Client Console — Site Owner Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <path d="M16 2L3 8v8c0 7.73 5.55 14.95 13 16.73C23.45 30.95 29 23.73 29 16V8L16 2z" fill="url(#sg)"
+                        stroke="rgba(255,255,255,0.2)" stroke-width="1" />
+                    <circle cx="16" cy="15" r="3" fill="url(#si)" />
+                    <defs>
+                        <linearGradient id="sg" x1="3" y1="2" x2="29" y2="30">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="100%" stop-color="#06b6d4" />
+                        </linearGradient>
+                        <linearGradient id="si" x1="7" y1="6" x2="25" y2="28">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="100%" stop-color="#06b6d4" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div class="brand-text">
+                <span class="brand-name"
+                    style="background:linear-gradient(135deg,#10b981,#06b6d4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">WAF
+                    Client</span>
+                <span class="brand-sub">SITE OWNER CONSOLE</span>
+            </div>
+        </div>
+
+        <div class="waf-mode-control">
+            <div class="mode-label">CLIENT CONSOLE</div>
+            <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">Site Owner View</div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-view="dashboard" id="nav-dashboard"><span
+                    class="nav-icon">📊</span><span class="nav-label">Overview</span></a>
+            <a href="#" class="nav-item" data-view="live" id="nav-live"><span class="nav-icon">🔴</span><span
+                    class="nav-label">Live Monitor</span><span class="live-dot"></span></a>
+            <a href="#" class="nav-item" data-view="sites" id="nav-sites"><span class="nav-icon">🌐</span><span
+                    class="nav-label">My Sites</span></a>
+            <a href="#" class="nav-item" data-view="headerbl" id="nav-headerbl"><span class="nav-icon">🚫</span><span
+                    class="nav-label">Header Blacklist</span></a>
+            <a href="#" class="nav-item" data-view="insights" id="nav-insights"><span class="nav-icon">💡</span><span
+                    class="nav-label">Security Insights</span></a>
+            <a href="#" class="nav-item" data-view="bots" id="nav-bots"><span class="nav-icon">🎭</span><span
+                    class="nav-label">Bot Activity</span></a>
+            <a href="#" class="nav-item" data-view="onboarding" id="nav-onboarding"><span
+                    class="nav-icon">📖</span><span class="nav-label">Setup Guide</span></a>
+            <a href="#" class="nav-item" data-view="sandbox" id="nav-sandbox"><span class="nav-icon">🧪</span><span
+                    class="nav-label">Rule Sandbox</span></a>
+            <a href="#" class="nav-item" data-view="alerts" id="nav-alerts"><span class="nav-icon">🔔</span><span
+                    class="nav-label">Alerts</span></a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="waf-status"><span class="status-dot active" id="waf-status-dot"></span><span class="status-text"
+                    id="waf-status-text" style="color:#10b981">PROTECTED</span></div>
+            <div id="user-menu"
+                style="margin:12px 0 0;padding:10px 12px;background:rgba(255,255,255,0.04);border-radius:8px;display:flex;align-items:center;gap:8px">
+                <div style="flex:1;min-width:0">
+                    <div id="user-display"
+                        style="font-size:0.78rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        —</div>
+                    <div id="user-role" style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase">—
+                    </div>
+                </div>
+                <button onclick="showChangePasswordModal()" title="Change Password"
+                    style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;color:var(--text-muted)">⚙️</button>
+                <button onclick="doLogout()" title="Logout"
+                    style="background:none;border:none;cursor:pointer;font-size:1rem;padding:4px;color:#ef4444">🚪</button>
+            </div>
+            <div class="sidebar-version">Powered by ModSecurity WAF</div>
+        </div>
+    </aside>
+
+    <main class="main-content" id="main-content">
+        <header class="main-header">
+            <div class="header-left"><button class="menu-toggle" id="menu-toggle">☰</button>
+                <h1 class="page-title" id="page-title">Overview</h1>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-sm" id="alert-bell"
+                    style="position:relative;font-size:1.2rem;cursor:pointer;background:none;border:none;color:var(--text-primary)"
+                    onclick="switchView('alerts')">
+                    🔔
+                    <span id="alert-badge"
+                        style="position:absolute;top:-4px;right:-6px;background:#ef4444;color:white;font-size:0.6rem;border-radius:50%;width:16px;height:16px;display:none;align-items:center;justify-content:center;font-weight:700">0</span>
+                </button>
+                <div class="header-time" id="header-time"></div>
+            </div>
+        </header>
+
+        <!-- OVERVIEW -->
+        <section class="view active" id="view-dashboard">
+            <div class="stats-grid">
+                <div class="stat-card stat-total" data-stat="total">
+                    <div class="stat-icon">📡</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-total-value">—</div>
+                        <div class="stat-label">Total Requests</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-blocked" data-stat="blocked">
+                    <div class="stat-icon">⛔</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-blocked-value">—</div>
+                        <div class="stat-label">Blocked (403)</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-critical" data-stat="critical">
+                    <div class="stat-icon">🔴</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-critical-value">—</div>
+                        <div class="stat-label">Critical Threats</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-high" data-stat="high">
+                    <div class="stat-icon">🟠</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-high-value">—</div>
+                        <div class="stat-label">High Severity</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-sources" data-stat="sources">
+                    <div class="stat-icon">🌍</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-sources-value">—</div>
+                        <div class="stat-label">Unique Sources</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-hosts" data-stat="hosts">
+                    <div class="stat-icon">🌐</div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="stat-hosts-value">—</div>
+                        <div class="stat-label">Protected Sites</div>
+                    </div>
+                </div>
+            </div>
+            <div id="stat-drilldown"></div>
+            <div class="charts-grid">
+                <div class="chart-card wide">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Traffic Timeline</h3>
+                    </div><canvas id="timeline-chart" height="220"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Threat Types</h3>
+                    </div><canvas id="attack-chart" height="220"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- LIVE MONITOR -->
+        <section class="view" id="view-live">
+            <div class="live-header">
+                <div class="live-indicator"><span class="live-pulse"></span><span>LIVE — Real-time Request
+                        Monitor</span></div>
+                <div class="live-controls">
+                    <input type="text" id="live-search" class="form-input"
+                        placeholder="🔍 Filter by IP, URI, or rule..."
+                        style="width:220px;height:30px;font-size:0.75rem;padding:4px 10px">
+                    <button class="btn btn-sm" id="live-pause">⏸ Pause</button>
+                    <button class="btn btn-sm" id="live-clear">🗑️ Clear</button>
+                    <label class="toggle-label"><input type="checkbox" id="live-alerts-only"> Threats Only</label>
+                </div>
+            </div>
+            <div class="live-feed" id="live-feed"></div>
+        </section>
+
+        <!-- MY SITES -->
+        <section class="view" id="view-sites">
+            <div class="sites-header">
+                <div>
+                    <h2>My Protected Websites</h2>
+                    <p class="rules-description">Onboard your website to be protected by the WAF. Each site has its own
+                        WAF mode.</p>
+                </div>
+                <button class="btn btn-primary" id="add-site-btn">+ Onboard Website</button>
+            </div>
+            <div class="sites-grid" id="sites-grid"></div>
+            <div class="modal-overlay" id="site-modal" style="display:none">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Onboard Website</h3><button class="modal-close" id="modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group"><label>Website Name</label><input type="text" id="site-name"
+                                placeholder="My Web App" class="form-input"></div>
+                        <div class="form-group"><label>Domain <small>(your public domain)</small></label><input
+                                type="text" id="site-domain" placeholder="shop.example.com" class="form-input"></div>
+                        <div class="form-group"><label>Backend Server URL <small>(where the real application
+                                    runs)</small></label><input type="text" id="site-target"
+                                placeholder="http://10.0.1.50:3000" class="form-input"></div>
+                        <div class="form-group"><label>WAF Mode</label>
+                            <select id="site-waf-mode" class="form-input">
+                                <option value="DETECTION">👁️ DETECTION — start with monitoring only (recommended for
+                                    new sites)</option>
+                                <option value="BLOCKING">🛡️ BLOCKING — block all detected attacks</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer"><button class="btn btn-ghost" id="modal-cancel">Cancel</button><button
+                            class="btn btn-primary" id="modal-save">Onboard</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- HEADER BLACKLIST -->
+        <section class="view" id="view-headerbl">
+            <div class="whitelist-header">
+                <div>
+                    <h2>Header Parameter Blacklist</h2>
+                    <p class="rules-description">Block requests based on HTTP header values. For example, block specific
+                        User-Agents, Referers, or API keys.</p>
+                </div>
+                <button class="btn btn-primary" id="add-headerbl-btn">+ Add Rule</button>
+            </div>
+            <div class="whitelist-table-wrapper">
+                <table class="events-table">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Header</th>
+                            <th>Match</th>
+                            <th>Value</th>
+                            <th>Reason</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="headerbl-table-body"></tbody>
+                </table>
+            </div>
+            <div class="modal-overlay" id="headerbl-modal" style="display:none">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Block by Header</h3><button class="modal-close" id="hbl-modal-close">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group"><label>Header Name</label>
+                            <select id="hbl-header" class="form-input">
+                                <option value="user-agent">User-Agent</option>
+                                <option value="referer">Referer</option>
+                                <option value="origin">Origin</option>
+                                <option value="x-forwarded-for">X-Forwarded-For</option>
+                                <option value="cookie">Cookie</option>
+                                <option value="authorization">Authorization</option>
+                                <option value="content-type">Content-Type</option>
+                                <option value="host">Host</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Match Type</label>
+                            <select id="hbl-match" class="form-input">
+                                <option value="contains">Contains</option>
+                                <option value="equals">Equals</option>
+                                <option value="starts_with">Starts With</option>
+                                <option value="ends_with">Ends With</option>
+                                <option value="regex">Regex</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Value to Match</label><input type="text" id="hbl-value"
+                                class="form-input" placeholder="e.g., sqlmap, python-requests"></div>
+                        <div class="form-group"><label>Reason</label><input type="text" id="hbl-reason"
+                                class="form-input" placeholder="Block scanner bots"></div>
+                    </div>
+                    <div class="modal-footer"><button class="btn btn-ghost" id="hbl-modal-cancel">Cancel</button><button
+                            class="btn btn-primary" id="hbl-modal-save">Add Rule</button></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ONBOARDING GUIDE -->
+        <section class="view" id="view-onboarding">
+            <div class="onboarding-content">
+                <div class="onboarding-hero">
+                    <h1>🚀 Website Setup Guide</h1>
+                    <p class="onboarding-subtitle">Get your website protected by the WAF in minutes</p>
+                    <div style="display:flex;gap:12px;margin-top:16px;justify-content:center;flex-wrap:wrap">
+                        <div class="card" style="padding:10px 20px;display:flex;align-items:center;gap:8px"><span
+                                style="font-size:1.2rem">⏱️</span><span
+                                style="font-size:0.82rem;color:var(--text-muted)">~5 min setup</span></div>
+                        <div class="card" style="padding:10px 20px;display:flex;align-items:center;gap:8px"><span
+                                style="font-size:1.2rem">🔧</span><span
+                                style="font-size:0.82rem;color:var(--text-muted)">No code changes</span></div>
+                        <div class="card" style="padding:10px 20px;display:flex;align-items:center;gap:8px"><span
+                                style="font-size:1.2rem">🛡️</span><span
+                                style="font-size:0.82rem;color:var(--text-muted)">Instant protection</span></div>
+                    </div>
+                </div>
+                <div class="onboarding-steps">
+                    <div class="step-card" style="animation:fadeSlideIn 0.4s ease 0.1s both">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Register Your Website</h3>
+                            <p>Go to <strong>My Sites</strong> and click <strong>"+ Onboard Website"</strong>. Enter
+                                your domain, backend URL, and choose a WAF mode.</p>
+                            <div class="card" style="padding:12px;margin-top:10px;border-left:3px solid #10b981">
+                                <strong style="color:#10b981">💡 Tip:</strong> Start with <strong>DETECTION</strong>
+                                mode to monitor traffic before blocking. This lets you identify false positives without
+                                disrupting real users.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step-card" style="animation:fadeSlideIn 0.4s ease 0.2s both">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Point DNS to the WAF</h3>
+                            <p>Update your DNS records so your domain points to the WAF server's IP address instead of
+                                your backend directly.</p>
+                            <div class="code-block">
+                                <pre><code># Change DNS A Record:
+# BEFORE: shop.example.com → your-server-ip
+# AFTER:  shop.example.com → WAF-server-ip
+
+# Or use ngrok for instant tunneling:
+ngrok http 8080 --hostname=your-domain.ngrok.app</code></pre>
+                            </div>
+                            <div class="card" style="padding:12px;margin-top:10px;border-left:3px solid #f97316">
+                                <strong style="color:#f97316">⚠️ Important:</strong> If using a CDN like Cloudflare, set
+                                the WAF server IP as the origin. The WAF should sit <em>between</em> the CDN and your
+                                backend.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step-card" style="animation:fadeSlideIn 0.4s ease 0.3s both">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Lock Down Your Backend</h3>
+                            <p>Configure your server's firewall to only accept connections from the WAF server IP. This
+                                prevents attackers from bypassing the WAF.</p>
+                            <div class="code-block">
+                                <pre><code># UFW (Ubuntu/Debian)
+sudo ufw allow from WAF_IP to any port 80
+sudo ufw allow from WAF_IP to any port 443
+sudo ufw deny 80
+sudo ufw deny 443
+
+# iptables
+iptables -A INPUT -p tcp -s WAF_IP --dport 80 -j ACCEPT
+iptables -A INPUT -p tcp --dport 80 -j DROP</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step-card" style="animation:fadeSlideIn 0.4s ease 0.4s both">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Test It</h3>
+                            <p>Verify everything works by sending normal and malicious requests.</p>
+                            <div class="code-block">
+                                <pre><code># Normal request (should work normally)
+curl https://your-domain.com/
+
+# Test SQL injection blocking (should get 403 in BLOCKING mode)
+curl "https://your-domain.com/?q=' OR 1=1--"
+
+# Test XSS blocking
+curl "https://your-domain.com/?q=&lt;script&gt;alert(1)&lt;/script&gt;"
+
+# Test path traversal blocking
+curl "https://your-domain.com/../../etc/passwd"</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step-card" style="animation:fadeSlideIn 0.4s ease 0.5s both">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h3>Monitor & Tune</h3>
+                            <p>Watch the <strong>Live Monitor</strong> for traffic. Review <strong>Security
+                                    Insights</strong> for recommendations. Check <strong>Bot Activity</strong> to see
+                                who's visiting your site.</p>
+                            <div class="card" style="padding:12px;margin-top:10px;border-left:3px solid #06b6d4">
+                                <strong style="color:#06b6d4">📊 Recommended:</strong> Monitor for at least 24 hours
+                                before switching to <strong>BLOCKING</strong> mode. Use the <strong>Alerts</strong> tab
+                                to get notified of anomalies automatically.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="step-card" style="animation:fadeSlideIn 0.4s ease 0.6s both">
+                        <div class="step-number">6</div>
+                        <div class="step-content">
+                            <h3>Enable Blocking & Add Rules</h3>
+                            <p>Switch to <strong>BLOCKING</strong> mode from <strong>My Sites</strong>. Then use
+                                <strong>Header Blacklist</strong> to block specific User-Agents (scanners, scrapers),
+                                and the <strong>Rule Sandbox</strong> below to test custom patterns.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="onboarding-architecture">
+                    <h2>How It Works</h2>
+                    <div class="arch-diagram">
+                        <div class="arch-node arch-user"><span class="arch-emoji">👤</span><span>Users</span></div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-node arch-dns"><span class="arch-emoji">🌐</span><span>DNS</span></div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-node arch-waf"><span class="arch-emoji">🛡️</span><span>WAF
+                                Proxy</span><small>Inspect + Block</small></div>
+                        <div class="arch-arrow">→</div>
+                        <div class="arch-node arch-backend"><span class="arch-emoji">🖥️</span><span>Your Server</span>
+                        </div>
+                    </div>
+                    <div style="margin-top:24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+                        <div class="card" style="padding:16px;text-align:center">
+                            <div style="font-size:2rem;margin-bottom:8px">🔍</div>
+                            <div style="font-weight:600;margin-bottom:4px;color:var(--text-primary)">Deep Inspection
+                            </div>
+                            <div style="font-size:0.75rem;color:var(--text-muted)">Every request analyzed against 20+
+                                ModSecurity rules for SQLi, XSS, RCE, and more</div>
+                        </div>
+                        <div class="card" style="padding:16px;text-align:center">
+                            <div style="font-size:2rem;margin-bottom:8px">🤖</div>
+                            <div style="font-weight:600;margin-bottom:4px;color:var(--text-primary)">Bot Detection</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted)">6-layer bot detection with JS
+                                challenges, header fingerprinting, and behavior analysis</div>
+                        </div>
+                        <div class="card" style="padding:16px;text-align:center">
+                            <div style="font-size:2rem;margin-bottom:8px">⚡</div>
+                            <div style="font-weight:600;margin-bottom:4px;color:var(--text-primary)">Auto-Response</div>
+                            <div style="font-size:0.75rem;color:var(--text-muted)">Playbooks auto-block IPs exceeding
+                                thresholds — no manual intervention needed</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CLIENT RULE SANDBOX -->
+        <section class="view" id="view-sandbox">
+            <div class="view-header">
+                <h2>🧪 Rule Sandbox (Simulation)</h2>
+                <p class="view-sub">Test a regex pattern against your recent traffic — see what it would block before
+                    deploying</p>
+            </div>
+            <div class="card" style="padding:24px;margin-bottom:24px">
+                <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;margin-bottom:16px">
+                    <div><label style="display:block;color:var(--text-muted);font-size:0.78rem;margin-bottom:6px">Regex
+                            Pattern</label>
+                        <input type="text" id="client-sb-pattern" class="form-input"
+                            placeholder="e.g., (wp-admin|phpmyadmin|.env)" style="width:100%">
+                    </div>
+                    <div><label
+                            style="display:block;color:var(--text-muted);font-size:0.78rem;margin-bottom:6px">Target</label>
+                        <select id="client-sb-target" class="form-input" style="width:100%">
+                            <option value="uri">URI</option>
+                            <option value="body">Body</option>
+                            <option value="headers">Headers</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end">
+                        <button class="btn-primary" id="client-sb-run" style="width:100%">🧪 Run Simulation</button>
+                    </div>
+                </div>
+            </div>
+            <div id="client-sb-results">
+                <div class="drilldown-empty">Enter a pattern and click Run Simulation to test it against your recent
+                    traffic.</div>
+            </div>
+            <div class="card" style="padding:20px;margin-top:24px;border-left:3px solid #8b5cf6">
+                <h3 style="color:#8b5cf6;margin-bottom:12px">📖 Quick Reference</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:0.82rem">
+                    <div>
+                        <table class="data-table" style="font-size:0.75rem">
+                            <tr>
+                                <td style="font-family:var(--font-mono);color:#10b981">(wp-admin|wp-login)</td>
+                                <td>WordPress probes</td>
+                            </tr>
+                            <tr>
+                                <td style="font-family:var(--font-mono);color:#10b981">(\.env|\.git)</td>
+                                <td>Config file leaks</td>
+                            </tr>
+                            <tr>
+                                <td style="font-family:var(--font-mono);color:#10b981">(\.\.[\/\\])</td>
+                                <td>Path traversal</td>
+                            </tr>
+                            <tr>
+                                <td style="font-family:var(--font-mono);color:#10b981">(curl|wget|nikto)</td>
+                                <td>Scanner user-agents</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div style="color:var(--text-muted);line-height:1.8">
+                        <strong style="color:#10b981">Low FP Rate (&lt;10%)</strong> — Safe to deploy<br>
+                        <strong style="color:#f97316">Medium FP Rate (10-30%)</strong> — Review matches<br>
+                        <strong style="color:#ef4444">High FP Rate (&gt;30%)</strong> — Too broad, narrow it<br>
+                        <em>This sandbox only simulates — no rules are deployed.</em>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- INSIGHTS VIEW -->
+        <section class="view" id="view-insights">
+            <div class="view-header">
+                <h2>💡 Security Insights</h2>
+                <p class="view-sub">AI-generated recommendations for your protected sites</p>
+            </div>
+            <div id="insights-content">
+                <div class="drilldown-empty">Loading insights…</div>
+            </div>
+        </section>
+
+        <!-- BOT ACTIVITY VIEW -->
+        <section class="view" id="view-bots">
+            <div class="view-header">
+                <h2>🎭 Bot Activity</h2>
+                <p class="view-sub">Traffic classification — human vs automated bot visitors with detection reasoning
+                </p>
+            </div>
+            <div id="bots-stats" class="stats-grid" style="margin-bottom:24px"></div>
+            <div id="bots-content">
+                <div class="drilldown-empty">Loading bot data…</div>
+            </div>
+        </section>
+
+        <!-- ALERTS VIEW -->
+        <section class="view" id="view-alerts">
+            <div class="view-header" style="display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <h2>🔔 Automated Alerts</h2>
+                    <p class="view-sub">Human-readable notifications about traffic patterns and automated responses</p>
+                </div>
+                <button class="btn btn-ghost" id="mark-all-read-btn">✓ Mark All Read</button>
+            </div>
+            <div id="alerts-content">
+                <div class="drilldown-empty">Loading alerts…</div>
+            </div>
+        </section>
+    </main>
+    <script src="app.js"></script>
+</body>
+
+</html>

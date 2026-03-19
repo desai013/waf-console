@@ -1,0 +1,68 @@
+# WAF Console — Quickstart
+# ============================================================
+# One command to start. No configuration needed for a demo.
+#
+# Usage:
+#   docker compose up -d
+#   open http://localhost:3000    ← setup wizard
+#
+# To try it with your own backend:
+#   DEFAULT_BACKEND=http://your-app:80 docker compose up -d
+# ============================================================
+
+services:
+
+  waf:
+    image: desai013/waf-console:latest   # pull from Docker Hub (no build needed)
+    # build: .                           # uncomment to build from source instead
+    container_name: waf-console
+    restart: unless-stopped
+    ports:
+      - "3000:3000"   # Analyst Console  ← open this in your browser
+      - "3001:3001"   # Client Console
+      - "8080:8080"   # WAF HTTP Proxy   ← point your site traffic here
+      - "8443:8443"   # WAF HTTPS Proxy
+    environment:
+      - NODE_ENV=production
+      - DEFAULT_BACKEND=${DEFAULT_BACKEND:-http://localhost:80}
+      - WAF_MODE=${WAF_MODE:-DETECTION}   # DETECTION is safe for first run; change to BLOCKING when ready
+      - REDIS_URL=redis://redis:6379
+      - DB_DRIVER=sqlite
+      - DB_PATH=/app/data/waf_events.db
+      # Optional — leave blank to disable:
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - WEBHOOK_URL=${WEBHOOK_URL:-}
+      - LICENSE_KEY=${LICENSE_KEY:-}
+    volumes:
+      - waf-data:/app/data   # persists across restarts (DB, secrets, certs)
+      - waf-logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const h=require('http');h.get('http://localhost:3000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: waf-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  waf-data:
+  waf-logs:
+  redis-data:
