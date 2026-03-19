@@ -1,27 +1,26 @@
 # =============================================================================
-# WAF Console 2.0 — Production Docker Image
+# WAF Console 2.0 — Node.js Control Plane Docker Image
 # =============================================================================
+#
+# This image runs the WAF Console management server ONLY.
+# Traffic inspection is handled by the owasp/modsecurity-crs:nginx image
+# (see docker-compose.yml).
 #
 # Build:
 #   docker build -t waf-console:latest .
+#   docker tag waf-console:latest desai013/waf-console:latest
+#   docker push desai013/waf-console:latest
 #
-# Push to Docker Hub:
-#   docker tag waf-console:latest YOURUSERNAME/waf-console:latest
-#   docker push YOURUSERNAME/waf-console:latest
+# Run (standalone demo — without real ModSecurity engine):
+#   docker run -d --name waf-console --restart unless-stopped \
+#     -p 3000:3000 -p 3001:3001 \
+#     -v waf-data:/app/data -v waf-logs:/app/logs \
+#     desai013/waf-console:latest
 #
-# Run:
-#   docker run -d \
-#     --name waf-console \
-#     --restart unless-stopped \
-#     -p 3000:3000 \
-#     -p 3001:3001 \
-#     -p 8080:8080 \
-#     -p 8443:8443 \
-#     -v waf-data:/app/data \
-#     -v waf-logs:/app/logs \
-#     waf-console:latest
+# Run (production — with ModSecurity, use docker-compose.yml instead):
+#   docker compose up -d
 #
-# First-boot admin password printed in docker logs waf-console
+# First-boot admin password printed in: docker logs waf-console
 # =============================================================================
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +57,7 @@ FROM node:20-bullseye-slim AS production
 
 # OCI image metadata
 LABEL org.opencontainers.image.title="WAF Console"
-LABEL org.opencontainers.image.description="Enterprise WAF with attack detection, bot protection, compliance reporting, and dual-console dashboard"
+LABEL org.opencontainers.image.description="WAF management console — pairs with owasp/modsecurity-crs:nginx for real ModSecurity traffic inspection. Provides Analyst Console, Client Console, rules management, and compliance reporting."
 LABEL org.opencontainers.image.version="2.0.0"
 LABEL org.opencontainers.image.licenses="Proprietary"
 
@@ -96,23 +95,27 @@ RUN mkdir -p data logs data/certs \
 ENV NODE_ENV=production \
     DASHBOARD_PORT=3000 \
     CLIENT_PORT=3001 \
-    PROXY_PORT=8080 \
-    HTTPS_PROXY_PORT=8443 \
     BIND_ADDRESS=0.0.0.0 \
-    WAF_MODE=BLOCKING \
+    WAF_MODE=DETECTION \
     DB_DRIVER=sqlite \
     DB_PATH=/app/data/waf_events.db \
     LOG_LEVEL=info \
-    TRUSTED_PROXY_COUNT=0
+    TRUSTED_PROXY_COUNT=1 \
+    # ModSecurity integration — shared volumes set via docker-compose
+    MODSEC_AUDIT_LOG=/var/log/modsec/audit.json \
+    MODSEC_RULES_DIR=/etc/modsecurity.d/custom-rules \
+    MODSEC_SITE_RULES_DIR=/etc/modsecurity.d/site-rules \
+    NGINX_CONTAINER_NAME=nginx-waf
 
 # Ports:
-#   3000 = Analyst Console  (keep INTERNAL — firewall this from internet)
+#   3000 = Analyst Console  (keep INTERNAL — firewall from internet)
 #   3001 = Client Console   (optional: expose to site owners)
-#   8080 = WAF Proxy HTTP   (expose to internet)
-#   8443 = WAF Proxy HTTPS  (expose to internet)
-EXPOSE 3000 3001 8080 8443
+#   Note: 8080/8443 traffic ports are handled by nginx-waf container
+EXPOSE 3000 3001
 
-# Mount these volumes to persist data across container restarts
+# Mount these volumes to persist data across restarts
+# Note: modsec-audit, modsec-custom-rules, modsec-site-rules are
+# additional volumes wired in docker-compose.yml at runtime
 VOLUME ["/app/data", "/app/logs"]
 
 # Health check — polls the unauthenticated /health endpoint

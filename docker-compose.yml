@@ -1,54 +1,132 @@
-# WAF Console — Quickstart
+# WAF Console — Production Docker Compose
 # ============================================================
-# One command to start. No configuration needed for a demo.
+# Architecture:
+#   nginx-waf (ModSecurity + OWASP CRS) :8080/:8443 → Backend
+#   waf-console (Node.js control plane) :3000/:3001
+#   redis                               (shared state)
 #
-# Usage:
+# One command to start:
 #   docker compose up -d
-#   open http://localhost:3000    ← setup wizard
-#
-# To try it with your own backend:
-#   DEFAULT_BACKEND=http://your-app:80 docker compose up -d
 # ============================================================
 
 services:
 
-  waf:
-    image: desai013/waf-console:latest   # pull from Docker Hub (no build needed)
-    # build: .                           # uncomment to build from source instead
+  # ──────────────────────────────────────────────────────────
+  # Nginx + ModSecurity + OWASP CRS — The Real WAF Engine
+  # Official OWASP image: https://hub.docker.com/r/owasp/modsecurity-crs
+  # ──────────────────────────────────────────────────────────
+  nginx-waf:
+    image: owasp/modsecurity-crs:nginx-alpine
+    container_name: nginx-waf
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # WAF Proxy HTTP  ← point your users' traffic here
+      - "8443:8443"   # WAF Proxy HTTPS
+    environment:
+      # Backend — where clean traffic is forwarded after inspection
+      - BACKEND=${DEFAULT_BACKEND:-http://your-app:80}
+      - PORT=8080
+      - SSL_PORT=8443
+
+      # ModSecurity engine mode (default: DetectionOnly — no customer disruption)
+      # Override per-site via WAF Console UI (writes to modsecurity/site-rules/)
+      - MODSECURITY_RULE_ENGINE=${WAF_MODE:-DetectionOnly}
+
+      # Audit logging — JSON format so Node.js can parse it
+      - MODSEC_AUDIT_LOG=/var/log/modsec/audit.json
+      - MODSEC_AUDIT_LOG_FORMAT=JSON
+      - MODSEC_AUDIT_LOG_PARTS=ABIJDEFHZ
+
+      # CRS Paranoia Level (1=default, 2=stricter, 3=high security)
+      - PARANOIA=${CRS_PARANOIA_LEVEL:-1}
+      - ANOMALY_INBOUND=${CRS_ANOMALY_INBOUND:-5}
+      - ANOMALY_OUTBOUND=${CRS_ANOMALY_OUTBOUND:-4}
+
+      # Pass real client IPs when behind a load balancer
+      - REAL_IP_HEADER=X-Forwarded-For
+      - REAL_IP_RECURSIVE=on
+      - REAL_IP_FROM=${TRUSTED_PROXY_CIDR:-10.0.0.0/8}
+    volumes:
+      # Shared audit log volume — nginx-waf writes, waf-console reads
+      - modsec-audit:/var/log/modsec
+      # Custom rules written by Node.js via modsec-rule-manager.js
+      - modsec-custom-rules:/etc/modsecurity.d/custom-rules
+      - modsec-site-rules:/etc/modsecurity.d/site-rules
+      # Override config (enables JSON logging, includes custom-rules dir)
+      - ./modsecurity/modsecurity-override.conf:/etc/modsecurity.d/modsecurity-override.conf:ro
+      - ./modsecurity/crs-setup-override.conf:/etc/modsecurity.d/crs-setup-override.conf:ro
+    networks:
+      - waf_internal
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ──────────────────────────────────────────────────────────
+  # WAF Console — Node.js Control Plane
+  # Analyst Console :3000 + Client Console :3001
+  # ──────────────────────────────────────────────────────────
+  waf-console:
+    image: desai013/waf-console:latest   # pull from Docker Hub
+    # build: .                           # uncomment to build from source
     container_name: waf-console
     restart: unless-stopped
     ports:
-      - "3000:3000"   # Analyst Console  ← open this in your browser
+      - "3000:3000"   # Analyst Console ← admin only — FIREWALL from internet
       - "3001:3001"   # Client Console
-      - "8080:8080"   # WAF HTTP Proxy   ← point your site traffic here
-      - "8443:8443"   # WAF HTTPS Proxy
     environment:
       - NODE_ENV=production
-      - DEFAULT_BACKEND=${DEFAULT_BACKEND:-http://localhost:80}
-      - WAF_MODE=${WAF_MODE:-DETECTION}   # DETECTION is safe for first run; change to BLOCKING when ready
       - REDIS_URL=redis://redis:6379
       - DB_DRIVER=sqlite
       - DB_PATH=/app/data/waf_events.db
-      # Optional — leave blank to disable:
+      - WAF_MODE=${WAF_MODE:-DETECTION}
+
+      # ModSecurity audit log path (shared volume — same path as nginx-waf writes to)
+      - MODSEC_AUDIT_LOG=/var/log/modsec/audit.json
+
+      # Rule directories (shared volumes — Node.js writes, nginx-waf reads)
+      - MODSEC_RULES_DIR=/etc/modsecurity.d/custom-rules
+      - MODSEC_SITE_RULES_DIR=/etc/modsecurity.d/site-rules
+
+      # Nginx container name for reload command
+      - NGINX_CONTAINER_NAME=nginx-waf
+
+      # Optional integrations
       - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY:-}
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - WEBHOOK_URL=${WEBHOOK_URL:-}
       - LICENSE_KEY=${LICENSE_KEY:-}
+      - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-1}
     volumes:
-      - waf-data:/app/data   # persists across restarts (DB, secrets, certs)
+      - waf-data:/app/data
       - waf-logs:/app/logs
+      # Shared volumes — same mounts as nginx-waf so Node.js can read/write
+      - modsec-audit:/var/log/modsec
+      - modsec-custom-rules:/etc/modsecurity.d/custom-rules
+      - modsec-site-rules:/etc/modsecurity.d/site-rules
+      # Docker socket so node can exec nginx reload (mount carefully in prod)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       redis:
         condition: service_healthy
+      nginx-waf:
+        condition: service_healthy
+    networks:
+      - waf_internal
     healthcheck:
-      test: ["CMD", "node", "-e", "const h=require('http');h.get('http://localhost:3000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"]
       interval: 15s
       timeout: 5s
       start_period: 20s
       retries: 3
 
+  # ──────────────────────────────────────────────────────────
+  # Redis — Shared rate-limit state, pub/sub for live events
+  # ──────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: waf-redis
@@ -56,6 +134,8 @@ services:
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
+    networks:
+      - waf_internal
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -63,6 +143,13 @@ services:
       retries: 3
 
 volumes:
-  waf-data:
-  waf-logs:
-  redis-data:
+  waf-data:              # Node.js SQLite DB, secrets, certs
+  waf-logs:              # Node.js application logs
+  redis-data:            # Redis persistence
+  modsec-audit:          # ModSecurity JSON audit log (nginx writes, node reads)
+  modsec-custom-rules:   # Whitelist/blacklist/custom rules (node writes, nginx reads)
+  modsec-site-rules:     # Per-site WAF mode rules (node writes, nginx reads)
+
+networks:
+  waf_internal:
+    driver: bridge

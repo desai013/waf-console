@@ -44,6 +44,10 @@ const updater = require('./update');
 const https = require('https');
 const fs = require('fs');
 
+// ── ModSecurity Integration ───────────────────────────────────────────────────
+const ModSecLogWatcher = require('./modsec-log-watcher');
+const modsecRuleManager = require('./modsec-rule-manager');
+
 // ── Security helpers ──────────────────────────────────────────────────────────
 // CR-02: HTML-escape all dynamic values before embedding in res.end() HTML strings
 function escapeHtml(s) {
@@ -96,6 +100,24 @@ if (db._rawDb) {
     anomalyEngine.seedFromDatabase(db._rawDb);
 } else {
     anomalyEngine.setDatabase(null);
+}
+
+// ============================================================================
+// ModSecurity — seed built-in rules as .conf on startup
+// ============================================================================
+try {
+    const fs = require('fs');
+    const path = require('path');
+    const builtinConf = ruleEngine.toSecRuleConf ? ruleEngine.toSecRuleConf() : null;
+    if (builtinConf) {
+        const rulesDir = process.env.MODSEC_RULES_DIR ||
+            path.join(__dirname, 'modsecurity', 'custom-rules');
+        fs.mkdirSync(rulesDir, { recursive: true });
+        fs.writeFileSync(path.join(rulesDir, 'builtin-rules.conf'), builtinConf, 'utf8');
+        logger.info('[ModSec] Built-in rules written to ModSecurity custom-rules directory', 'startup');
+    }
+} catch (err) {
+    logger.warn('[ModSec] Could not write built-in rules conf: ' + err.message, 'startup');
 }
 
 // ============================================================================
@@ -1239,13 +1261,32 @@ h1{font-size:2.2em;margin-bottom:12px}p{color:#ff8888;font-size:1.1em;margin:6px
 
     const proto = tlsEnabled ? 'https' : 'http';
     analystServer.listen(config.DASHBOARD_PORT, config.BIND_ADDRESS, () => {
-        logger.info(`ModSecurity WAF Console v2.0 started`, 'startup');
+        logger.info(`WAF Console v2.0 — ModSecurity + OWASP CRS Edition`, 'startup');
         logger.info(`Analyst Console: ${proto}://${config.BIND_ADDRESS}:${config.DASHBOARD_PORT}`, 'startup');
-        logger.info(`Client Console: ${proto}://${config.BIND_ADDRESS}:${config.CLIENT_PORT}`, 'startup');
-        logger.info(`WAF Proxy: ${proto}://${config.BIND_ADDRESS}:${config.PROXY_PORT}`, 'startup');
-        logger.info(`Mode: ${config.WAF_MODE} | Rules: ${ruleEngine.getRules().length} | Auth: Enabled`, 'startup');
-        logger.info(`License: ${licenseInfo.isDemoMode ? 'DEMO' : licenseInfo.customer} | State: ${redisReady ? 'Redis' : 'In-Memory'} | DB: ${config.DB_DRIVER === 'postgres' ? 'PostgreSQL' : 'SQLite'}`, 'startup');
+        logger.info(`Client Console:  ${proto}://${config.BIND_ADDRESS}:${config.CLIENT_PORT}`, 'startup');
+        logger.info(`WAF Engine:      Nginx + ModSecurity + OWASP CRS (port 8080/8443)`, 'startup');
+        logger.info(`Mode: ${config.WAF_MODE} | DB: ${config.DB_DRIVER === 'postgres' ? 'PostgreSQL' : 'SQLite'} | State: ${redisReady ? 'Redis' : 'In-Memory'}`, 'startup');
         logger.info(`TLS: ${tlsEnabled ? 'Enabled' : 'Disabled'} | GeoIP: ${geoip.maxmindAvailable ? 'MaxMind' : 'Heuristic'} | SIEM: ${siemEnabled ? 'Enabled' : 'Disabled'}`, 'startup');
+
+        // Start ModSecurity audit log watcher — populates dashboard from real engine events
+        const modsecWatcher = new ModSecLogWatcher(db, {
+            logger,
+            onEvent: (event) => {
+                // Broadcast to live dashboard WebSocket clients
+                const payload = JSON.stringify({ type: 'waf_event', data: event });
+                if (typeof allWsClients !== 'undefined') {
+                    for (const client of allWsClients) {
+                        if (client.readyState === 1) client.send(payload);
+                    }
+                }
+                // Feed anomaly engine and bot detector with real events
+                try { anomalyEngine.processEvent(event); } catch { /* non-critical */ }
+            },
+        });
+        modsecWatcher.start();
+        logger.info('[ModSec] Audit log watcher started — watching ' + (process.env.MODSEC_AUDIT_LOG || '/var/log/modsec/audit.json'), 'startup');
+
+        if (process.send) process.send('ready');
     });
 
     clientServer.listen(config.CLIENT_PORT, config.BIND_ADDRESS, () => {
