@@ -921,7 +921,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.textContent = '⏳ Generating...';
         btn.disabled = true;
         try {
-            await generateSwyftComplyPDF();
+            await generateCompliancePDF();
         } catch (err) {
             alert('Error generating report: ' + err.message);
         } finally {
@@ -932,9 +932,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ============================================================================
-// SwyftComply PDF Report Generator
+// WAF Console Compliance PDF Report Generator
 // ============================================================================
-async function generateSwyftComplyPDF() {
+async function generateCompliancePDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const pageW = doc.internal.pageSize.getWidth();
@@ -961,7 +961,7 @@ async function generateSwyftComplyPDF() {
         doc.rect(0, pageH - 12, pageW, 12, 'F');
         doc.setFontSize(7);
         doc.setTextColor(120, 120, 140);
-        doc.text(`SwyftComply Compliance Report — Generated ${dateStr} at ${timeStr}`, margin, pageH - 5);
+        doc.text(`WAF Console Compliance Report — Generated ${dateStr} at ${timeStr}`, margin, pageH - 5);
         doc.text(`Page ${pageNum}`, pageW - margin, pageH - 5, { align: 'right' });
     }
 
@@ -1034,7 +1034,7 @@ async function generateSwyftComplyPDF() {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(36);
     doc.setTextColor(0, 212, 255);
-    doc.text('SwyftComply', pageW / 2, 110, { align: 'center' });
+    doc.text('WAF Console', pageW / 2, 110, { align: 'center' });
 
     doc.setFontSize(14);
     doc.setTextColor(148, 163, 184);
@@ -1073,7 +1073,7 @@ async function generateSwyftComplyPDF() {
     // Footer
     doc.setFontSize(8);
     doc.setTextColor(100, 116, 139);
-    doc.text('Powered by SwyftComply — ModSecurity WAF v3 Architecture', pageW / 2, pageH - 20, { align: 'center' });
+    doc.text('Powered by WAF Console — OWASP-Compliant Web Application Firewall', pageW / 2, pageH - 20, { align: 'center' });
     doc.text('CONFIDENTIAL — For authorized personnel only', pageW / 2, pageH - 14, { align: 'center' });
 
     // ==== PAGE 2: EXECUTIVE SUMMARY ====
@@ -1193,7 +1193,7 @@ async function generateSwyftComplyPDF() {
     }
 
     // Download
-    doc.save(`SwyftComply_Report_${now.toISOString().split('T')[0]}.pdf`);
+    doc.save(`WAFConsole_Compliance_Report_${now.toISOString().split('T')[0]}.pdf`);
 }
 
 // ============================================================================

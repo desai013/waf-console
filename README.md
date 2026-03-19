@@ -1,5 +1,3 @@
-# WAF Console — GitHub README
-# Last updated: 2026-03-19
 
 <div align="center">
   <h1>🛡️ WAF Console</h1>
@@ -29,6 +27,44 @@ docker compose up -d
 Open **http://localhost:3000** — the setup wizard guides you through the rest.
 
 That's it. No ModSecurity. No Nginx config. No separate installs.
+
+---
+
+## 🖥️ Local Demo vs 🌐 Production
+
+| | Local Demo | Production |
+|---|---|---|
+| **Goal** | Try it, see the dashboard | Protect a real website |
+| **Server needed** | Your laptop | VPS with public IP (~$6/mo) |
+| **Domain needed** | ❌ No | ✅ Yes (e.g. Namecheap ~$10/yr) |
+| **Admin console** | `http://localhost:3000` | `http://yourdomain.com:3000` ⚠️ firewall this |
+| **WAF proxy** | `http://localhost:8080` | `http://yourdomain.com:8080` |
+| **Setup time** | 2 min | ~30 min |
+
+### 🌐 Going to Production (30 minutes)
+
+**1.** Get a VPS — DigitalOcean, Vultr, or Linode (~$6/month Ubuntu droplet). Note its public IP (e.g. `134.209.45.23`).
+
+**2.** In Namecheap DNS, add A Records pointing your domain to the VPS IP:
+```
+@   → 134.209.45.23
+www → 134.209.45.23
+```
+
+**3.** SSH in and run the WAF:
+```bash
+ssh root@134.209.45.23
+apt install -y docker.io
+docker run -d --name waf-console --restart unless-stopped \
+  -p 3000:3000 -p 3001:3001 -p 8080:8080 -p 8443:8443 \
+  -e DEFAULT_BACKEND=http://YOUR-APP-IP:80 \
+  -v waf-data:/app/data -v waf-logs:/app/logs \
+  desai013/waf-console:latest
+```
+
+**4.** Open `http://yourdomain.com:3000` — setup wizard runs automatically.
+
+> ⚠️ **Firewall port 3000** from the internet — it's your admin panel. Port 8080 is what user traffic flows through.
 
 ---
 

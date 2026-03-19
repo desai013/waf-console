@@ -1,6 +1,6 @@
 # Terms of Service
 
-**WAF Console by SwyftComply**
+**WAF Console by desai013**
 **Effective Date:** March 19, 2026
 **Last Updated:** March 19, 2026
 
@@ -146,8 +146,8 @@ We may update these Terms from time to time. We will notify you of material chan
 
 For questions about these Terms:
 
-**Email:** legal@swyftcomply.com
-**Address:** SwyftComply, Inc., Erie, Pennsylvania, USA
+**Email:** desai013@gannon.edu
+**Address:** Erie, Pennsylvania, USA
 
 ---
 

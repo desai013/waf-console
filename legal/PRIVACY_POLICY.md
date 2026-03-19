@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**WAF Console by SwyftComply**
+**WAF Console by desai013**
 **Effective Date:** March 19, 2026
 **Last Updated:** March 19, 2026
 
@@ -109,7 +109,7 @@ Depending on your jurisdiction, you may have the right to:
 - **Delete** your personal data (subject to legal retention requirements)
 - **Data portability** — receive a copy of your data in a portable format
 
-To exercise any of these rights, contact: **privacy@swyftcomply.com**
+To exercise any of these rights, contact: **desai013@gannon.edu**
 
 ---
 
@@ -140,8 +140,8 @@ We will notify you of material changes via email at least 30 days before they ta
 
 For privacy-related questions or to exercise your data rights:
 
-**Email:** privacy@swyftcomply.com
-**Address:** SwyftComply, Inc., Erie, Pennsylvania, USA
+**Email:** desai013@gannon.edu
+**Address:** Erie, Pennsylvania, USA
 
 For EU/UK customers, you also have the right to lodge a complaint with your local data protection authority.
 

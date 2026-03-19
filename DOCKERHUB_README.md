@@ -16,6 +16,38 @@ Then open **http://YOUR-SERVER-IP:3000** — the setup wizard guides you through
 
 ---
 
+## 🖥️ Local Demo vs 🌐 Production
+
+| | Local Demo | Production |
+|---|---|---|
+| **Goal** | Try the dashboard | Protect a real website |
+| **Server** | Your laptop | VPS with public IP (~$6/mo) |
+| **Domain** | Not needed | Yes (e.g. from Namecheap) |
+| **Admin console** | `http://localhost:3000` | `http://yourdomain.com:3000` ⚠️ firewall this |
+| **WAF proxy** | `http://localhost:8080` | `http://yourdomain.com:8080` |
+| **Setup time** | 2 min | ~30 min |
+
+### Going to Production
+
+**1.** Get a VPS (DigitalOcean, Vultr, Linode — ~$6/month Ubuntu droplet). Note its public IP.
+
+**2.** In Namecheap DNS, add an A Record pointing your domain to the VPS IP.
+
+**3.** SSH into the VPS and run:
+```bash
+apt install -y docker.io
+docker run -d --name waf-console --restart unless-stopped \
+  -p 3000:3000 -p 3001:3001 -p 8080:8080 -p 8443:8443 \
+  -v waf-data:/app/data -v waf-logs:/app/logs \
+  desai013/waf-console:latest
+```
+
+**4.** Open `http://yourdomain.com:3000` — setup wizard runs automatically.
+
+> ⚠️ **Firewall port 3000** so only you can reach the admin panel. Port 8080 is what your users' traffic flows through.
+
+---
+
 ## What It Does
 
 Once running, point your DNS or load balancer at the WAF proxy ports (`8080`/`8443`). The WAF inspects every HTTP request and forwards clean traffic to your backend application.
@@ -127,7 +159,7 @@ docker run ... \
   -e ACME_ENABLED=true \
   -e ACME_EMAIL=you@example.com \
   -e ACME_DOMAIN=waf.yourdomain.com \
-  YOURUSERNAME/waf-console:latest
+  desai013/waf-console:latest
 ```
 
 **Option 2 — Bring your own cert:**
@@ -136,7 +168,7 @@ docker run ... \
   -e TLS_CERT_PATH=/app/data/certs/fullchain.pem \
   -e TLS_KEY_PATH=/app/data/certs/privkey.pem \
   -v /path/to/your/certs:/app/data/certs:ro \
-  YOURUSERNAME/waf-console:latest
+  desai013/waf-console:latest
 ```
 
 ---
@@ -201,6 +233,6 @@ docker logs waf-console
 
 ## Support & Docs
 
-- [Getting Started Guide](https://github.com/YOURUSERNAME/waf-console/blob/main/GETTING_STARTED.md)
-- [Full Documentation](https://github.com/YOURUSERNAME/waf-console)
-- [Report a Security Issue](https://github.com/YOURUSERNAME/waf-console/security)
+- [Getting Started Guide](https://github.com/desai013/waf-console/blob/main/GETTING_STARTED.md)
+- [Full Documentation](https://github.com/desai013/waf-console)
+- [Report a Security Issue](https://github.com/desai013/waf-console/security)

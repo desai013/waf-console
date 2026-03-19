@@ -2,8 +2,68 @@
 
 This guide walks you through installing and configuring WAF Console on your own server from scratch.
 
-**Estimated time:** 15–30 minutes
-**Skill level:** Intermediate (comfortable with Linux command line)
+---
+
+## 🖥️ Local Demo vs 🌐 Production — Which applies to you?
+
+| | Local Demo | Production |
+|---|---|---|
+| **Goal** | Try the product, see the dashboard | Protect your real website |
+| **Server needed** | Your laptop | A VPS with a public IP |
+| **Domain needed** | ❌ No | ✅ Yes (e.g. from Namecheap, ~$10/yr) |
+| **Admin console** | `http://localhost:3000` | `http://yourdomain.com:3000` |
+| **WAF proxy** | `http://localhost:8080` | `http://yourdomain.com:8080` |
+| **Time** | 2 minutes | ~30 minutes |
+
+### 🖥️ Local Demo (2 minutes)
+```bash
+docker run -d --name waf-console --restart unless-stopped \
+  -p 3000:3000 -p 3001:3001 -p 8080:8080 -p 8443:8443 \
+  -v waf-data:/app/data -v waf-logs:/app/logs \
+  desai013/waf-console:latest
+```
+Open **http://localhost:3000** — done. See the traffic simulator below to populate the dashboard.
+
+### 🌐 Production (30 minutes)
+
+**1. Get a VPS** — DigitalOcean, Vultr, or Linode. Create a $6/month Ubuntu droplet and note its public IP (e.g. `134.209.45.23`).
+
+**2. Point your domain DNS to the VPS** (in Namecheap or your registrar):
+```
+A Record:  @   → 134.209.45.23
+A Record:  www → 134.209.45.23
+```
+
+**3. SSH in and start the WAF:**
+```bash
+ssh root@134.209.45.23
+apt install -y docker.io
+docker run -d --name waf-console --restart unless-stopped \
+  -p 3000:3000 -p 3001:3001 -p 8080:8080 -p 8443:8443 \
+  -e DEFAULT_BACKEND=http://YOUR-APP-IP:80 \
+  -v waf-data:/app/data -v waf-logs:/app/logs \
+  desai013/waf-console:latest
+```
+
+**4. Access your live console:**
+```
+http://yourdomain.com:3000   ← Analyst Console (admin — restrict to your IP only!)
+http://yourdomain.com:8080   ← WAF Proxy (point your users' DNS here)
+```
+
+> ⚠️ **Important:** Firewall port 3000 so only your IP can reach the admin panel:
+> ```bash
+> ufw allow from YOUR_HOME_IP to any port 3000
+> ufw deny 3000
+> ufw enable
+> ```
+
+Continue with the steps below to complete setup via the wizard.
+
+---
+
+**Estimated time:** 15–30 minutes (production) · 2 minutes (local demo)
+**Skill level:** Intermediate (comfortable with terminal)
 
 ---
 
@@ -33,7 +93,7 @@ docker run -d \
   -p 8443:8443 \
   -v waf-data:/app/data \
   -v waf-logs:/app/logs \
-  swyftcomply/waf-console:latest
+  desai013/waf-console:latest
 ```
 
 **Get your auto-generated admin password:**
@@ -109,7 +169,7 @@ docker run -d \
   -e ACME_EMAIL=you@yourcompany.com \
   -v waf-data:/app/data \
   -v waf-logs:/app/logs \
-  swyftcomply/waf-console:latest
+  desai013/waf-console:latest
 ```
 
 > **Requirement:** Port 80 must be publicly accessible for Let's Encrypt domain verification.
@@ -229,6 +289,6 @@ A: Stay in Detection mode until you're confident. Review the "Events" tab — CR
 
 ## Need Help?
 
-- 📧 **Support:** support@swyftcomply.com
+- 📧 **Support:** desai013@gannon.edu
 - 📖 **Full documentation:** [README.md](README.md)
 - ⚖️ **Legal:** [Terms of Service](legal/TERMS_OF_SERVICE.md) · [Privacy Policy](legal/PRIVACY_POLICY.md)

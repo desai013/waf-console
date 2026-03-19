@@ -26,7 +26,7 @@ const crypto = require('crypto');
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-const UPDATE_FEED_URL  = process.env.UPDATE_FEED_URL  || 'https://updates.swyftcomply.com/waf-console/feed.json';
+const UPDATE_FEED_URL  = process.env.UPDATE_FEED_URL  || 'https://raw.githubusercontent.com/desai013/waf-console/main/updates/feed.json';
 const UPDATE_STATE_FILE = path.join(__dirname, 'data', 'update-state.json');
 const RULES_FILE        = path.join(__dirname, 'rules', 'custom-updates.json');
 const CURRENT_VERSION   = (() => {
