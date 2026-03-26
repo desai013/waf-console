@@ -71,37 +71,63 @@ function parseAuditEntry(line) {
 
     const req     = tx.request  || {};
     const res     = tx.response || {};
-    const msgs    = entry.messages || [];
+    // messages live inside tx in the OWASP CRS nginx image (not at entry.messages)
+    const msgs    = tx.messages || entry.messages || [];
     const headers = req.headers  || {};
 
-    // Extract the highest-severity message (first match is usually highest priority)
-    const topMsg  = msgs[0] || {};
-    const details = topMsg.details || {};
-    const ruleId  = details.ruleId || (msgs.length ? String(msgs[0].ruleId || '') : '');
+    // Parse non-standard timestamp: "Thu Mar 26 05:43:32 2026"
+    let timestamp;
+    try {
+        // Rearrange to "Mar 26 2026 05:43:32" which Date() can parse
+        const p = (tx.time_stamp || '').split(' ').filter(Boolean);
+        // p = ['Thu','Mar','26','05:43:32','2026']
+        timestamp = p.length >= 5
+            ? new Date(`${p[1]} ${p[2]} ${p[4]} ${p[3]}`).toISOString()
+            : new Date(tx.time_stamp).toISOString();
+    } catch {
+        timestamp = new Date().toISOString();
+    }
+    // Find primary attack rule — skip anomaly-scoring rules (949xxx/980xxx)
+    // which fire as bookkeeping, not the actual attack cause
+    const ANOMALY_PREFIXES = ['949', '980'];
+    const primaryMsg = msgs.find(m => {
+        const id = String(m?.details?.ruleId || m?.ruleId || '');
+        return id && !ANOMALY_PREFIXES.some(pfx => id.startsWith(pfx));
+    }) || msgs[0] || {};
 
-    const statusCode  = parseInt(res.http_code || '200', 10);
-    const isBlocked   = statusCode === 403 || statusCode === 406;
-    const anomalyScore = tx.anomaly_scores?.inbound || details.anomalyScore || 0;
+    const details      = primaryMsg.details || {};
+    const ruleId       = details.ruleId || String(primaryMsg.ruleId || '');
 
-    const attackType = msgs.length
-        ? getRuleCategory(ruleId)
-        : null;
+    // Anomaly score: from tx.anomaly_scores or parse from last message's data string
+    let anomalyScore = 0;
+    if (tx.anomaly_scores?.inbound) {
+        anomalyScore = parseInt(tx.anomaly_scores.inbound, 10);
+    } else if (msgs.length) {
+        const lastData = (msgs[msgs.length - 1]?.details?.data || '');
+        const m = lastData.match(/`(\d+)'\s*\)/);
+        if (m) anomalyScore = parseInt(m[1], 10);
+    }
+
+    const statusCode = parseInt(res.http_code || '200', 10);
+    const isBlocked  = statusCode === 403 || statusCode === 406;
+    const attackType = ruleId ? getRuleCategory(ruleId) : null;
 
     return {
-        timestamp:   new Date(tx.time_stamp || Date.now()).toISOString(),
-        source_ip:   tx.client_ip || '0.0.0.0',
-        method:      req.method   || 'GET',
-        uri:         req.uri      || '/',
-        user_agent:  headers['User-Agent'] || headers['user-agent'] || '',
-        status_code: statusCode,
-        action:      isBlocked ? 'BLOCK' : 'DETECT',
-        attack_type: attackType,
-        rule_id:     ruleId,
-        severity:    getSeverityFromScore(anomalyScore),
-        reason:      topMsg.message || '',
-        site_domain: headers['Host'] || headers['host'] || 'unknown',
-        anomaly_score: parseInt(anomalyScore, 10) || 0,
-        engine:      'modsecurity', // marks events coming from real ModSec
+        timestamp,
+        source_ip:    tx.client_ip   || '0.0.0.0',
+        method:       req.method      || 'GET',
+        uri:          req.uri         || '/',
+        user_agent:   headers['User-Agent'] || headers['user-agent'] || '',
+        status_code:  statusCode,
+        action:       isBlocked ? 'BLOCK' : 'DETECT',
+        attack_type:  attackType,
+        rule_id:      ruleId,
+        rule_msg:     primaryMsg.message || details.data || '',
+        severity:     getSeverityFromScore(anomalyScore),
+        reason:       primaryMsg.message || '',
+        site_domain:  headers['Host'] || headers['host'] || 'unknown',
+        anomaly_score: anomalyScore,
+        engine:       'modsecurity',
     };
 }
 

@@ -1,6 +1,8 @@
 # WAF Console
 
-**Enterprise-grade Web Application Firewall** with a dual-console SIEM dashboard, OWASP rule engine, bot detection, geo-blocking, and real-time threat intelligence — packaged as a single Docker container.
+**Enterprise-grade Web Application Firewall** powered by **real ModSecurity v3 + OWASP CRS** with a dual-console SIEM dashboard, bot detection, geo-blocking, and real-time threat intelligence. Three Docker containers, one command.
+
+> **Architecture:** `nginx-waf` (ModSecurity v3.0 + OWASP CRS 3.3 — 927 rules) inspects all traffic. `waf-console` (Node.js) manages rules, ingests audit logs, and powers the dashboard. `redis` handles shared session state.
 
 > **First boot:** The setup wizard runs automatically. Visit `http://YOUR-SERVER:3000` to create your admin account and add your first protected site.
 
@@ -9,42 +11,94 @@
 ## Quick Start
 
 ```bash
-docker run -d --name waf-console --restart unless-stopped -p 3000:3000 -p 3001:3001 -p 8080:8080 -p 8443:8443 -v waf-data:/app/data -v waf-logs:/app/logs (YOUR_DOCKER_USERNAME)/waf-console:latest
+docker compose up -d
 ```
 
-Then open **http://YOUR-SERVER-IP:3000** — the setup wizard guides you through the rest.
+Then open **http://localhost:3000** — the setup wizard guides you through the rest.
+
+> No `docker-compose.yml`? Grab it from GitHub: `curl -O https://raw.githubusercontent.com/desai013/waf-console/main/docker-compose.yml && docker compose up -d`
 
 ---
 
-## 🖥️ Local Demo vs 🌐 Production
+## 🖥️ Demo Mode vs 🌐 Production Mode
 
-| | Local Demo | Production |
-|---|---|---|
-| **Goal** | Try the dashboard | Protect a real website |
-| **Server** | Your laptop | VPS with public IP (~$6/mo) |
-| **Domain** | Not needed | Yes (e.g. from Namecheap) |
-| **Admin console** | `http://localhost:3000` | `http://yourdomain.com:3000` ⚠️ firewall this |
-| **WAF proxy** | `http://localhost:8080` | `http://yourdomain.com:8080` |
-| **Setup time** | 2 min | ~30 min |
+---
 
-### Going to Production
+### 🆕 Demo Mode — local laptop, no DNS needed
 
-**1.** Get a VPS (DigitalOcean, Vultr, Linode — ~$6/month Ubuntu droplet). Note its public IP.
+**Use this for:** Exploring the dashboard, testing attacks, learning how the WAF works.
 
-**2.** In Namecheap DNS, add an A Record pointing your domain to the VPS IP.
+**What runs:** `modsec-init` (volume setup) + `nginx-waf` (ModSecurity engine) + `waf-console` (dashboard) + `redis`.
 
-**3.** SSH into the VPS and run:
 ```bash
-apt install -y docker.io
-docker run -d --name waf-console --restart unless-stopped \
-  -p 3000:3000 -p 3001:3001 -p 8080:8080 -p 8443:8443 \
-  -v waf-data:/app/data -v waf-logs:/app/logs \
-  desai013/waf-console:latest
+# Clone the repo and start
+git clone https://github.com/desai013/waf-console.git
+cd waf-console
+docker compose up -d
+
+# Find your auto-generated admin password
+docker logs waf-console | grep -i password
+
+# Simulate real attacks (populates dashboard in ~30s)
+docker exec -it waf-console node /app/simulate-traffic.js
+
+# Send a live SQLi attack — should get 403 Forbidden from ModSecurity
+curl -i "http://localhost:8080/?q=' OR 1=1--"
+
+# Open Analyst Console (admin)
+xdg-open http://localhost:3000   # Linux
+open http://localhost:3000       # Mac
+# Windows: open browser to http://localhost:3000
+
+# Stop
+docker compose down
 ```
 
-**4.** Open `http://yourdomain.com:3000` — setup wizard runs automatically.
+In demo mode, the WAF backend is the Client Console (`http://waf-console:3001`) so clean traffic lands on the WAF's own UI — no separate app needed.
 
-> ⚠️ **Firewall port 3000** so only you can reach the admin panel. Port 8080 is what your users' traffic flows through.
+---
+
+### 🌐 Production Mode — real VPS, real website
+
+**Use this for:** Protecting a real website. Set `DEFAULT_BACKEND` to your app’s internal IP.
+
+**Files used:** `docker-compose.yml` + `.env` (created from `.env.example`).
+
+```bash
+# On your VPS
+apt install -y docker.io docker-compose-plugin
+git clone https://github.com/desai013/waf-console.git
+cd waf-console
+cp .env.example .env
+```
+
+Edit `.env` — set at minimum:
+```bash
+DEFAULT_BACKEND=http://YOUR-APP-IP:80   # your real web server
+WAF_MODE=BLOCKING                        # block attacks, not just log
+```
+
+Start the stack:
+```bash
+docker compose up -d
+docker compose ps    # all 4 services should be healthy
+```
+
+Point your domain DNS A Record → VPS IP, then firewall port 3000:
+```bash
+ufw allow 8080; ufw allow 8443; ufw allow 22; ufw deny 3000; ufw enable
+```
+
+Visit `http://yourdomain.com:3000` (from your IP only) to complete setup.
+
+In production mode, traffic flows:
+```
+User → yourdomain.com:8080 (nginx-waf/ModSecurity)
+      → YOUR-APP-IP:80 (your backend)
+      → audit log → waf-console dashboard
+```
+
+> ⚠️ **Firewall port 3000.** It is the full admin panel — never expose it to the internet.
 
 ---
 
@@ -73,32 +127,85 @@ Internet → WAF Proxy :8080/:8443 → Your App
 
 ---
 
-## Docker Compose (Production)
+## Docker Compose (Full Production Stack)
+
+The recommended way to run WAF Console. Copy this file or clone the repo and run `docker compose up -d`:
 
 ```yaml
-version: '3.8'
 services:
-  waf:
+
+  # Init container: fixes shared volume permissions (runs as root, exits cleanly)
+  modsec-init:
+    image: busybox
+    restart: "no"
+    user: root
+    command: ["sh", "-c",
+      "mkdir -p /var/log/modsec /etc/modsecurity.d/custom-rules /etc/modsecurity.d/site-rules &&
+       touch /var/log/modsec/audit.json &&
+       chmod 777 /var/log/modsec /etc/modsecurity.d/custom-rules /etc/modsecurity.d/site-rules &&
+       chmod 666 /var/log/modsec/audit.json"]
+    volumes:
+      - modsec-audit:/var/log/modsec
+      - modsec-custom-rules:/etc/modsecurity.d/custom-rules
+      - modsec-site-rules:/etc/modsecurity.d/site-rules
+
+  # Nginx + ModSecurity v3 + OWASP CRS (the real WAF engine)
+  nginx-waf:
+    image: owasp/modsecurity-crs:nginx-alpine
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      - BACKEND=${DEFAULT_BACKEND:-http://waf-console:3001}
+      - PORT=8080
+      - SSL_PORT=8443
+      - MODSECURITY_RULE_ENGINE=${WAF_MODE:-DetectionOnly}
+      - MODSEC_AUDIT_LOG=/var/log/modsec/audit.json
+      - MODSEC_AUDIT_LOG_FORMAT=JSON
+      - PARANOIA=${CRS_PARANOIA_LEVEL:-1}
+    volumes:
+      - modsec-audit:/var/log/modsec
+      - modsec-custom-rules:/etc/modsecurity.d/custom-rules
+      - modsec-site-rules:/etc/modsecurity.d/site-rules
+    depends_on:
+      modsec-init:
+        condition: service_completed_successfully
+      waf-console:
+        condition: service_started
+
+  # WAF Console — Node.js control plane + SIEM dashboard
+  waf-console:
     image: desai013/waf-console:latest
     restart: unless-stopped
     ports:
-      - "3000:3000"   # Analyst Console (restrict to internal network!)
+      - "3000:3000"   # Analyst Console (⚠️ firewall from internet)
       - "3001:3001"   # Client Console
-      - "8080:8080"   # WAF HTTP Proxy
-      - "8443:8443"   # WAF HTTPS Proxy
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
-      - DEFAULT_BACKEND=http://your-app:80
+      - REDIS_URL=redis://redis:6379
+      - DB_DRIVER=sqlite
+      - MODSEC_AUDIT_LOG=/var/log/modsec/audit.json
+      - MODSEC_RULES_DIR=/etc/modsecurity.d/custom-rules
+      - MODSEC_SITE_RULES_DIR=/etc/modsecurity.d/site-rules
+      - NGINX_CONTAINER_NAME=nginx-waf
     volumes:
       - waf-data:/app/data
       - waf-logs:/app/logs
-    depends_on: [redis]
+      - modsec-audit:/var/log/modsec
+      - modsec-custom-rules:/etc/modsecurity.d/custom-rules
+      - modsec-site-rules:/etc/modsecurity.d/site-rules
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      modsec-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis-data:/data
 
@@ -106,6 +213,9 @@ volumes:
   waf-data:
   waf-logs:
   redis-data:
+  modsec-audit:
+  modsec-custom-rules:
+  modsec-site-rules:
 ```
 
 ---
@@ -216,6 +326,7 @@ docker logs waf-console
 | Tag | Description |
 |-----|-------------|
 | `latest` | Latest stable release |
+| `2.1.0` | v2.1 — Real ModSecurity v3 + OWASP CRS, audit log pipeline, volume permission fix |
 | `2.0.0` | v2.0 — dual-console, setup wizard, update manager |
 
 ---

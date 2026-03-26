@@ -12,6 +12,32 @@
 services:
 
   # ──────────────────────────────────────────────────────────
+  # Volume init — runs as root to fix permissions on all shared
+  # modsec volumes before nginx-waf and waf-console start.
+  # Without this, nginx worker and node (both non-root) cannot
+  # write to freshly-created Docker volumes owned by root.
+  # ──────────────────────────────────────────────────────────
+  modsec-init:
+    image: busybox
+    container_name: modsec-init
+    restart: "no"
+    user: root
+    command: [
+      "sh", "-c",
+      "mkdir -p /var/log/modsec /etc/modsecurity.d/custom-rules /etc/modsecurity.d/site-rules &&
+       touch /var/log/modsec/audit.json &&
+       chmod 777 /var/log/modsec /etc/modsecurity.d/custom-rules /etc/modsecurity.d/site-rules &&
+       chmod 666 /var/log/modsec/audit.json &&
+       echo 'modsec volume permissions fixed'"
+    ]
+    volumes:
+      - modsec-audit:/var/log/modsec
+      - modsec-custom-rules:/etc/modsecurity.d/custom-rules
+      - modsec-site-rules:/etc/modsecurity.d/site-rules
+    networks:
+      - waf_internal
+
+  # ──────────────────────────────────────────────────────────
   # Nginx + ModSecurity + OWASP CRS — The Real WAF Engine
   # Official OWASP image: https://hub.docker.com/r/owasp/modsecurity-crs
   # ──────────────────────────────────────────────────────────
@@ -24,7 +50,9 @@ services:
       - "8443:8443"   # WAF Proxy HTTPS
     environment:
       # Backend — where clean traffic is forwarded after inspection
-      - BACKEND=${DEFAULT_BACKEND:-http://your-app:80}
+      # In production: override with your actual app, e.g. BACKEND=http://my-app:8000
+      # In demo mode:  traffic proxies to the Client Console (port 3001)
+      - BACKEND=${DEFAULT_BACKEND:-http://waf-console:3001}
       - PORT=8080
       - SSL_PORT=8443
 
@@ -52,16 +80,21 @@ services:
       # Custom rules written by Node.js via modsec-rule-manager.js
       - modsec-custom-rules:/etc/modsecurity.d/custom-rules
       - modsec-site-rules:/etc/modsecurity.d/site-rules
-      # Override config (enables JSON logging, includes custom-rules dir)
-      - ./modsecurity/modsecurity-override.conf:/etc/modsecurity.d/modsecurity-override.conf:ro
-      - ./modsecurity/crs-setup-override.conf:/etc/modsecurity.d/crs-setup-override.conf:ro
+      # NOTE: modsecurity-override.conf is configured via env vars above,
+      #   NOT mounted as a file — the image's entrypoint writes this file
+      #   itself and rejects external :ro mounts at that path.
     networks:
       - waf_internal
+    depends_on:
+      modsec-init:
+        condition: service_completed_successfully
+      waf-console:
+        condition: service_started   # ensures waf-console hostname resolves before nginx starts
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/"]
       interval: 15s
       timeout: 5s
-      start_period: 15s
+      start_period: 20s
       retries: 3
 
   # ──────────────────────────────────────────────────────────
@@ -69,8 +102,8 @@ services:
   # Analyst Console :3000 + Client Console :3001
   # ──────────────────────────────────────────────────────────
   waf-console:
-    image: desai013/waf-console:latest   # pull from Docker Hub
-    # build: .                           # uncomment to build from source
+    build: .                             # build from local source
+    # image: desai013/waf-console:latest # uncomment to pull from Docker Hub instead
     container_name: waf-console
     restart: unless-stopped
     ports:
@@ -111,9 +144,9 @@ services:
       # Docker socket so node can exec nginx reload (mount carefully in prod)
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
+      modsec-init:
+        condition: service_completed_successfully
       redis:
-        condition: service_healthy
-      nginx-waf:
         condition: service_healthy
     networks:
       - waf_internal
